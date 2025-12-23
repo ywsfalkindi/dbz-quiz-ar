@@ -1,34 +1,31 @@
-import { Howl } from 'howler';
+// لا نستورد Howl في الأعلى لتسريع تحميل الصفحة الأولى
 
-export const sounds = {
-  // صوت النقر العادي
-  click: new Howl({
-    src: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'],
-    volume: 0.5
-  }),
-  
-  // صوت الإجابة الصحيحة (نجاح)
-  correct: new Howl({
-    src: ['https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'],
-    volume: 0.5
-  }),
-  
-  // صوت الخطأ (تلقي ضربة)
-  wrong: new Howl({
-    src: ['https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'],
-    volume: 0.8
-  }),
-  
-  // صوت الفوز باللعبة
-  win: new Howl({
-    src: ['https://assets.mixkit.co/active_storage/sfx/1434/1434-preview.mp3'],
-    volume: 0.6
-  }),
+type SoundType = 'click' | 'correct' | 'wrong' | 'win' | 'charge';
+
+const soundUrls = {
+  click: ['https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'],
+  correct: ['https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'],
+  wrong: ['https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'],
+  win: ['https://assets.mixkit.co/active_storage/sfx/1434/1434-preview.mp3'],
+  // صوت شحن الطاقة (جديد)
+  charge: ['https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3'] 
 };
 
-export const playSound = (type: keyof typeof sounds) => {
-  // نتأكد أن الكود يعمل في المتصفح فقط
-  if (typeof window !== 'undefined') {
-    sounds[type].play();
+export const playSound = async (type: SoundType) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    // استيراد ديناميكي: لن يتم تحميل المكتبة إلا عند استدعاء الدالة
+    const { Howl } = await import('howler');
+
+    const sound = new Howl({
+      src: soundUrls[type],
+      volume: type === 'wrong' ? 0.8 : 0.5,
+      html5: true, // لتشغيل أفضل على الجوال
+    });
+
+    sound.play();
+  } catch (error) {
+    console.error("فشل تشغيل الصوت:", error);
   }
 };

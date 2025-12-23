@@ -57,3 +57,23 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome, Safari and Opera */
 }
+
+/* --- تحسين الأداء (درس 8) --- */
+@media (prefers-reduced-motion: reduce) {
+  .glass-panel {
+    backdrop-filter: none;
+    background: rgba(20, 20, 20, 0.95); /* لون ثابت بدلاً من الضبابية الثقيلة */
+  }
+  
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* إصلاح الخط العربي */
+.font-cairo {
+  font-family: var(--font-cairo), sans-serif;
+}
