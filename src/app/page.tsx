@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from './store/gameStore';
 import { fetchGameQuestions, verifyAnswerAction } from './actions/gameActions';
+import { playSound } from './utils/sounds'; // استدعاء الأصوات
 
 import HealthBar from './components/HealthBar';
 import QuestionCard from './components/QuestionCard';
@@ -24,7 +25,10 @@ const StartScreen = ({ onStart }: { onStart: () => void }) => (
     <motion.button
       whileHover={{ scale: 1.1, boxShadow: '0 0 20px #ef4444' }}
       whileTap={{ scale: 0.9 }}
-      onClick={onStart}
+      onClick={() => {
+        playSound('click');
+        onStart();
+      }}
       className="px-12 py-6 bg-red-600 text-white text-3xl font-bold rounded-lg shadow-lg"
     >
       ابدأ القتال
@@ -45,7 +49,10 @@ const GameOverScreen = ({ onRestart }: { onRestart: () => void }) => (
     <motion.button
       whileHover={{ scale: 1.1, rotate: 5 }}
       whileTap={{ scale: 0.9 }}
-      onClick={onRestart}
+      onClick={() => {
+        playSound('click');
+        onRestart();
+      }}
       className="px-10 py-4 bg-green-500 text-white text-2xl font-bold rounded-lg"
     >
       إعادة المحاولة
@@ -66,7 +73,10 @@ const GameWonScreen = ({ score, onRestart }: { score: number; onRestart: () => v
     <motion.button
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
-      onClick={onRestart}
+      onClick={() => {
+        playSound('click');
+        onRestart();
+      }}
       className="px-10 py-4 bg-blue-500 text-white text-2xl font-bold rounded-lg"
     >
       العب مرة أخرى
@@ -92,9 +102,13 @@ export default function Home() {
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
+  
+  // حالة الوميض الأحمر عند الضرر
+  const [damageFlash, setDamageFlash] = useState(false);
 
   useEffect(() => {
     async function loadQuestions() {
+      // نجلب الأسئلة فقط إذا لم تكن موجودة (للحفاظ على ال persist)
       if (status === 'playing' && questions.length === 0) {
         const fetchedQuestions = await fetchGameQuestions();
         setQuestions(fetchedQuestions);
@@ -114,21 +128,39 @@ export default function Home() {
   const handleAnswer = async (questionId: string, answerKey: string) => {
     if (isVerifying || selectedAnswerKey) return;
 
+    playSound('click');
     setIsVerifying(true);
     setSelectedAnswerKey(answerKey);
 
     const { isCorrect, correctAnswerKey } = await verifyAnswerAction(questionId, answerKey);
+    
+    // التعامل مع المؤثرات الصوتية والبصرية
+    if (isCorrect) {
+      playSound('correct');
+    } else {
+      playSound('wrong');
+      setDamageFlash(true);
+      setTimeout(() => setDamageFlash(false), 300); // وميض سريع
+    }
+
     answerQuestion(isCorrect);
     setCorrectAnswerKey(correctAnswerKey);
 
     setTimeout(() => {
       // Use getState to prevent stale closures
       const { currentQuestionIndex: latestIndex, questions: latestQuestions } = useGameStore.getState();
+      
       if (latestIndex < latestQuestions.length - 1) {
+        // إذا بقيت أسئلة
         nextQuestion();
       } else {
-        setGameWon();
+        // انتهت اللعبة (فوز)
+        if (useGameStore.getState().health > 0) {
+             playSound('win');
+             setGameWon();
+        }
       }
+      
       setSelectedAnswerKey(null);
       setIsVerifying(false);
       setCorrectAnswerKey(null);
@@ -138,7 +170,7 @@ export default function Home() {
   const currentQuestion = questions[currentQuestionIndex];
 
   return (
-    <main className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-8 md:p-12 bg-black text-white">
+    <main className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-8 md:p-12 bg-black text-white relative overflow-hidden">
       <AnimatePresence mode="wait">
         {status === 'start' && (
           <StartScreen onStart={handleStart} />
@@ -159,7 +191,7 @@ export default function Home() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
             transition={{ duration: 0.5 }}
-            className="w-full max-w-4xl"
+            className="w-full max-w-4xl z-10"
           >
             <div className="flex justify-between items-center w-full mb-8">
               <HealthBar health={health} />
@@ -195,7 +227,11 @@ export default function Home() {
           <div key="loading" className="text-white text-2xl">جاري تحميل الأسئلة...</div>
         )}
       </AnimatePresence>
+
+      {/* طبقة الوميض الأحمر عند الضرر */}
+      {damageFlash && (
+        <div className="fixed inset-0 bg-red-600 opacity-30 pointer-events-none z-50 animate-pulse" />
+      )}
     </main>
   );
 }
-

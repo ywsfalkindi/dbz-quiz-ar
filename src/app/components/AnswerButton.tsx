@@ -1,5 +1,6 @@
 'use client'
 import { motion } from 'framer-motion';
+import { useEffect } from 'react';
 
 interface AnswerButtonProps {
   answer: string;
@@ -9,6 +10,14 @@ interface AnswerButtonProps {
 }
 
 export default function AnswerButton({ answer, onClick, isCorrect, disabled }: AnswerButtonProps) {
+
+  // إضافة تأثير الاهتزاز عند الخطأ
+  useEffect(() => {
+    if (isCorrect === false && typeof navigator !== 'undefined' && navigator.vibrate) {
+      // اهتزاز لمدة 200 مللي ثانية
+      navigator.vibrate(200);
+    }
+  }, [isCorrect]);
 
   const buttonVariants = {
     rest: {
@@ -33,7 +42,7 @@ export default function AnswerButton({ answer, onClick, isCorrect, disabled }: A
     incorrect: {
       backgroundColor: '#ef4444', // red-500
       color: '#ffffff',
-      x: [0, -10, 10, -10, 10, 0],
+      x: [0, -10, 10, -10, 10, 0], // اهتزاز بصري
       transition: { duration: 0.5 },
     },
     disabled: {
