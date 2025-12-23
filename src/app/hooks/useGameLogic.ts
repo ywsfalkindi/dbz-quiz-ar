@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
-import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction } from '../actions/gameActions';
+import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction, getGameConfig } from '../actions/gameActions'; // تأكدنا من استيراد getGameConfig
 import { playSound } from '../utils/sounds';
 import confetti from 'canvas-confetti';
 
-// دالة مساعدة للاهتزاز (تعمل فقط على الهواتف)
 const vibrateDevice = (pattern: number | number[]) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(pattern);
@@ -18,8 +17,22 @@ export const useGameLogic = () => {
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
   const [damageFlash, setDamageFlash] = useState(false);
   const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
-  // تحميل الأسئلة
+  // 1. تحميل الإعدادات من السيرفر عند فتح اللعبة
+  useEffect(() => {
+    async function initGame() {
+      // جلب الإعدادات
+      const config = await getGameConfig();
+      // تحديث المتجر بالإعدادات
+      store.setGameConfig(config);
+      setIsConfigLoaded(true);
+    }
+    initGame();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // تعمل مرة واحدة فقط
+
+  // 2. تحميل الأسئلة
   useEffect(() => {
     async function loadQuestions() {
       if (store.status === 'playing' && store.questions.length === 0) {
@@ -28,16 +41,18 @@ export const useGameLogic = () => {
       }
     }
     loadQuestions();
-  }, [store.status, store.questions.length, store]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.status, store.questions.length]);
 
-  // تصفير الإجابات المخفية عند كل سؤال جديد
+  // تصفير الإجابات المخفية
   useEffect(() => {
     setHiddenAnswers([]);
   }, [store.currentQuestionIndex]);
 
   const handleStart = () => {
+    if (!isConfigLoaded) return; // منع البدء قبل تحميل الإعدادات
     playSound('click');
-    vibrateDevice(50); // اهتزاز خفيف
+    vibrateDevice(50);
     store.startGame();
   };
 
@@ -49,8 +64,8 @@ export const useGameLogic = () => {
 
   const handleUseSenzu = () => {
     if (store.inventory.senzuBeans > 0 && store.health < 100) {
-      playSound('correct'); // صوت الشفاء
-      vibrateDevice([50, 50, 50]); // نبضات شفاء
+      playSound('correct');
+      vibrateDevice([50, 50, 50]);
       store.useSenzuBean();
     }
   };
@@ -105,7 +120,7 @@ export const useGameLogic = () => {
   const handleTimeUp = () => {
     if (isVerifying || selectedAnswerKey) return;
     playSound('wrong');
-    vibrateDevice([100, 50, 100, 50, 100]); // اهتزاز قوي للخسارة
+    vibrateDevice([100, 50, 100, 50, 100]);
     setDamageFlash(true);
     setTimeout(() => setDamageFlash(false), 500);
     store.answerQuestion(false); 
@@ -121,17 +136,16 @@ export const useGameLogic = () => {
     setSelectedAnswerKey(answerKey);
 
     const { isCorrect, correctAnswerKey } = await verifyAnswerAction(questionId, answerKey);
-    
     if (isCorrect) {
       playSound('correct');
-      vibrateDevice([50, 30, 50]); // اهتزاز "نجاح"
+      vibrateDevice([50, 30, 50]);
       confetti({
         particleCount: 100, spread: 70, origin: { y: 0.7 },
         colors: ['#22c55e', '#FFD600']
       });
     } else {
       playSound('wrong');
-      vibrateDevice([100, 100, 100]); // اهتزاز "خطأ"
+      vibrateDevice([100, 100, 100]);
       setDamageFlash(true);
       setTimeout(() => setDamageFlash(false), 500);
     }
@@ -144,7 +158,7 @@ export const useGameLogic = () => {
   return {
     ...store,
     selectedAnswerKey, isVerifying, correctAnswerKey,
-    damageFlash, hiddenAnswers,
+    damageFlash, hiddenAnswers, isConfigLoaded,
     handleStart, handleRestart, handleUseSenzu, handleUseHint, handleTimeUp, handleAnswer,
     saiyanForm: store.getSaiyanForm()
   };

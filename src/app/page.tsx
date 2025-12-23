@@ -15,11 +15,27 @@ export default function Home() {
   const {
     status, health, score, questions, currentQuestionIndex, inventory,
     handleStart, handleRestart, handleAnswer, handleTimeUp, handleUseSenzu, handleUseHint,
-    selectedAnswerKey, isVerifying, correctAnswerKey, damageFlash, hiddenAnswers, saiyanForm
+    selectedAnswerKey, isVerifying, correctAnswerKey, damageFlash, hiddenAnswers, saiyanForm, isConfigLoaded
   } = useGameLogic();
 
   const currentQuestion = questions[currentQuestionIndex];
   const isLoading = status === 'playing' && !currentQuestion;
+
+  // شاشة الصيانة
+  if (status === 'maintenance') {
+    return (
+        <div className="fixed inset-0 w-full h-dvh bg-black flex flex-col items-center justify-center text-center p-6 bg-space-pattern">
+            <h1 className="text-4xl font-bold text-dbz-orange mb-4">⚠️ منطقة تدريب مغلقة</h1>
+            <p className="text-white text-xl">جوكو وفيجيتا يدمران المكان حالياً... عد لاحقاً!</p>
+            <div className="mt-8 text-6xl animate-pulse">🚧</div>
+        </div>
+    )
+  }
+
+  // شاشة التحميل الأولية
+  if (!isConfigLoaded) {
+     return <div className="fixed inset-0 bg-black flex items-center justify-center text-white">جاري استشعار الطاقة...</div>
+  }
 
   return (
     <motion.main 
@@ -27,7 +43,6 @@ export default function Home() {
       variants={shakeVariants}
       className="fixed inset-0 w-full h-dvh bg-black bg-space-pattern flex flex-col overflow-hidden font-sans"
     >
-      {/* وميض الضرر الأحمر */}
       {damageFlash && (
         <div className="absolute inset-0 bg-red-600/30 z-50 pointer-events-none mix-blend-overlay" />
       )}

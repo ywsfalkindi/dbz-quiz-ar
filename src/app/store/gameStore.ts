@@ -3,7 +3,14 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Question } from '../actions/gameActions';
 
 export type SaiyanForm = 'base' | 'kaioken' | 'ssj' | 'blue' | 'ui';
-type GameStatus = 'start' | 'playing' | 'won' | 'lost';
+type GameStatus = 'start' | 'playing' | 'won' | 'lost' | 'maintenance'; // أضفنا وضع الصيانة
+
+interface GameConfig {
+  timerDuration: number;
+  senzuCount: number;
+  hintCount: number;
+  isMaintenanceMode: boolean;
+}
 
 interface GameState {
   score: number;
@@ -13,10 +20,12 @@ interface GameState {
   timer: number;
   status: GameStatus;
   questions: Question[];
-  difficultyMultiplier: number; // جديد: لزيادة الصعوبة
+  difficultyMultiplier: number;
   inventory: { senzuBeans: number; hints: number };
-  
+  config: GameConfig; // تخزين الإعدادات
+
   // Actions
+  setGameConfig: (config: GameConfig) => void; // دالة جديدة
   setQuestions: (questions: Question[]) => void;
   startGame: () => void;
   resetGame: () => void;
@@ -41,21 +50,39 @@ const useGameStore = create<GameState>()(
       questions: [],
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
+      config: { timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false }, // قيم افتراضية
+
+      setGameConfig: (config) => set(() => {
+        // إذا كان وضع الصيانة مفعل، نغير الحالة فوراً
+        if (config.isMaintenanceMode) {
+          return { config, status: 'maintenance' };
+        }
+        return { config };
+      }),
 
       setQuestions: (questions) => set({ questions }),
 
-      startGame: () => set({ 
-        status: 'playing', 
-        currentQuestionIndex: 0, 
-        timer: 15, 
-        score: 0, 
-        health: 100, 
-        inventory: { senzuBeans: 1, hints: 1 } 
-      }),
+      startGame: () => {
+        const state = get();
+        // استخدام القيم من الـ Config
+        set({ 
+          status: 'playing', 
+          currentQuestionIndex: 0, 
+          timer: state.config.timerDuration, // استخدام الوقت المخصص
+          score: 0, 
+          health: 100, 
+          inventory: { 
+            senzuBeans: state.config.senzuCount, // استخدام عدد السينزو المخصص
+            hints: state.config.hintCount 
+          } 
+        });
+      },
 
-      resetGame: () => set({ status: 'start' }), // العودة للشاشة الرئيسية
+      resetGame: () => set({ status: 'start' }),
 
-      decrementTimer: () => set((state) => ({ timer: Math.max(0, state.timer - 1) })),
+      decrementTimer: () => set((state) => ({ 
+        timer: Math.max(0, state.timer - 1) 
+      })),
 
       useSenzuBean: () => set((state) => {
         if (state.inventory.senzuBeans > 0 && state.health < 100) {
@@ -80,7 +107,6 @@ const useGameStore = create<GameState>()(
           return {
             score: state.score + 100 + streakBonus + timeBonus,
             streak: state.streak + 1,
-            // كل 5 إجابات صحيحة متتالية تزيد الصعوبة قليلاً
             difficultyMultiplier: state.streak > 0 && state.streak % 5 === 0 ? state.difficultyMultiplier + 1 : state.difficultyMultiplier
           };
         }
@@ -94,8 +120,9 @@ const useGameStore = create<GameState>()(
       }),
 
       nextQuestion: () => set((state) => {
-        // حساب الوقت بناءً على الصعوبة: كلما زادت الصعوبة قل الوقت (بحد أدنى 5 ثواني)
-        const newTime = Math.max(5, 15 - state.difficultyMultiplier);
+        // حساب الوقت بناءً على الصعوبة والوقت الأساسي من الإعدادات
+        const baseTime = state.config.timerDuration;
+        const newTime = Math.max(5, baseTime - state.difficultyMultiplier);
         return {
           currentQuestionIndex: state.currentQuestionIndex + 1,
           timer: newTime
@@ -119,5 +146,4 @@ const useGameStore = create<GameState>()(
     }
   )
 );
-
 export default useGameStore;

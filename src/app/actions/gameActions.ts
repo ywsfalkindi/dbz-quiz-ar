@@ -178,3 +178,24 @@ export const getLeaderboardAction = async () => {
   return []; 
 }
 };
+
+export const getGameConfig = async () => {
+  try {
+    const config = await client.fetch(`*[_type == "gameConfig"][0]{
+      timerDuration,
+      senzuCount,
+      hintCount,
+      isMaintenanceMode
+    }`);
+    
+    // إذا لم توجد إعدادات، نرجع القيم الافتراضية
+    return config || { 
+      timerDuration: 15, 
+      senzuCount: 1, 
+      hintCount: 1, 
+      isMaintenanceMode: false 
+    };
+  } catch {
+    return { timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false };
+  }
+};
