@@ -1,6 +1,6 @@
 'use server';
 import { z } from 'zod'; 
-import { headers } from 'next/headers';
+import { headers } from 'next/headers'; 
 import { client } from '@/../sanity/lib/client';
 
 const rateLimitMap = new Map<string, number>();
@@ -66,7 +66,7 @@ export const fetchGameQuestions = async (): Promise<Question[]> => {
       answer
     }
   }`);
-  
+
   return questions.map(q => ({
     ...q,
     answers: q.answers || [],
@@ -105,6 +105,7 @@ export const verifyAnswerAction = async (
   }
   
   rateLimitMap.set(ip, now);
+
   // --- بداية الكود الجديد (التحقق) ---
   const result = verifyAnswerSchema.safeParse({ questionId, answerKey });
 
@@ -116,6 +117,7 @@ export const verifyAnswerAction = async (
       explanation: 'بيانات غير صالحة! هل تحاول خداع زين-أوه؟' 
     };
   }
+
   try {
     // Fetch the question with the full answer data for verification
     const question = await client.fetch<SanityQuestion>(
@@ -155,5 +157,29 @@ export const verifyAnswerAction = async (
     console.error('Error verifying answer:', error);
     // In case of error, return a fallback that prevents crashes
     return { isCorrect: false, correctAnswerKey: '', explanation: 'An error occurred during verification.' };
+  }
+};
+
+// --- إضافة جديدة: دالة جلب الإجابات الخاطئة (تلميح كايو) ---
+export const getWrongAnswersAction = async (questionId: string): Promise<string[]> => {
+  try {
+    const question = await client.fetch<SanityQuestion>(
+      `*[_type == "question" && _id == $questionId][0]{ answers }`,
+      { questionId }
+    );
+
+    if (!question || !question.answers) return [];
+
+    // نجد الإجابات الخاطئة فقط
+    const wrongAnswers = question.answers.filter(a => a.isCorrect !== true);
+    
+    // نختار 2 عشوائياً لضمان عدم التكرار والنمطية
+    const shuffled = wrongAnswers.sort(() => 0.5 - Math.random());
+    
+    // نرجع مفاتيح (_key) أول إجابتين
+    return shuffled.slice(0, 2).map(a => a._key);
+  } catch (error) {
+    console.error('Error getting wrong answers:', error);
+    return [];
   }
 };

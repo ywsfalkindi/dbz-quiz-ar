@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from './store/gameStore';
-import { fetchGameQuestions, verifyAnswerAction } from './actions/gameActions';
+import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction } from './actions/gameActions'; // <-- إضافة getWrongAnswersAction
 import { playSound } from './utils/sounds';
 
 import HealthBar from './components/HealthBar';
 import QuestionCard from './components/QuestionCard';
 import AnswerButton from './components/AnswerButton';
 import PowerLevel from './components/PowerLevel';
-import GameTimer from './components/GameTimer'; // استدعاء المؤقت الجديد
+import GameTimer from './components/GameTimer';
 
 const StartScreen = ({ onStart }: { onStart: () => void }) => (
   <motion.div
@@ -92,20 +92,24 @@ export default function Home() {
     score,
     questions,
     currentQuestionIndex,
+    inventory, // <-- المخزون
     answerQuestion,
     resetGame,
     startGame,
     nextQuestion,
     setGameWon,
     setQuestions,
+    useSenzuBean: applySenzu, // أعد التسمية هنا
+    decrementHint: applyHint, // أعد التسمية هنا
   } = useGameStore();
 
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
-  
-  // حالة الوميض الأحمر عند الضرر
   const [damageFlash, setDamageFlash] = useState(false);
+  
+  // --- إضافة جديدة: حالة الإجابات المخفية ---
+  const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadQuestions() {
@@ -117,6 +121,11 @@ export default function Home() {
     loadQuestions();
   }, [status, questions.length, setQuestions]);
 
+  // تصفير الإجابات المخفية عند تغيير السؤال
+  useEffect(() => {
+    setHiddenAnswers([]);
+  }, [currentQuestionIndex]);
+
   const handleStart = () => {
     startGame();
   };
@@ -125,7 +134,27 @@ export default function Home() {
     resetGame();
   };
 
-  // دالة التعامل مع انتهاء الوقت
+  // --- دوال القوى المساعدة ---
+  const handleUseSenzu = () => {
+  if (inventory.senzuBeans > 0 && health < 100) {
+    playSound('correct'); 
+    applySenzu(); // استخدم الاسم الجديد بدلاً من useSenzuBean
+  }
+};
+
+  const handleUseHint = async () => {
+    // نتحقق من توفر التلميح وعدم استخدامه مسبقاً للسؤال الحالي
+    if (inventory.hints > 0 && hiddenAnswers.length === 0 && currentQuestion && !isVerifying) {
+      const wrongKeys = await getWrongAnswersAction(currentQuestion._id);
+      if (wrongKeys.length > 0) {
+        playSound('click');
+        setHiddenAnswers(wrongKeys);
+        applyHint();
+      }
+    }
+  };
+  // -------------------------
+
   const handleTimeUp = () => {
     if (isVerifying || selectedAnswerKey) return; 
 
@@ -133,10 +162,8 @@ export default function Home() {
     setDamageFlash(true);
     setTimeout(() => setDamageFlash(false), 300);
     
-    // نرسل false كإجابة خاطئة
     answerQuestion(false); 
 
-    // الانتقال التلقائي
     setTimeout(() => {
        const { currentQuestionIndex: latestIndex, questions: latestQuestions } = useGameStore.getState();
        if (latestIndex < latestQuestions.length - 1) {
@@ -218,9 +245,40 @@ export default function Home() {
               <PowerLevel score={score} />
             </div>
 
-            {/* إضافة المؤقت هنا */}
             <GameTimer onTimeUp={handleTimeUp} /> 
             
+            {/* --- شريط القوى المساعدة (Power-ups Bar) --- */}
+            <div className="flex justify-center gap-4 mb-4 w-full max-w-2xl">
+              
+              {/* زر السينزو بين */}
+              <button
+                onClick={handleUseSenzu}
+                disabled={inventory.senzuBeans === 0 || health === 100}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all
+                  ${inventory.senzuBeans > 0 && health < 100 
+                    ? 'bg-green-600 hover:bg-green-500 text-white shadow-[0_0_15px_#22c55e]' 
+                    : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
+              >
+                <span>💊 Senzu</span>
+                <span className="bg-black bg-opacity-30 px-2 rounded-full">{inventory.senzuBeans}</span>
+              </button>
+
+              {/* زر تلميح كايو */}
+              <button
+                onClick={handleUseHint}
+                disabled={inventory.hints === 0 || hiddenAnswers.length > 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all
+                  ${inventory.hints > 0 && hiddenAnswers.length === 0
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_#3b82f6]' 
+                    : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
+              >
+                <span>📡 King Kai</span>
+                <span className="bg-black bg-opacity-30 px-2 rounded-full">{inventory.hints}</span>
+              </button>
+
+            </div>
+            {/* ------------------------------------------- */}
+
             <QuestionCard question={currentQuestion.title} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
@@ -238,6 +296,7 @@ export default function Home() {
                     onClick={() => handleAnswer(currentQuestion._id, ans._key)}
                     isCorrect={buttonState}
                     disabled={isVerifying || !!selectedAnswerKey}
+                    isHidden={hiddenAnswers.includes(ans._key)} // <-- تمرير الخاصية
                   />
                 );
               })}
