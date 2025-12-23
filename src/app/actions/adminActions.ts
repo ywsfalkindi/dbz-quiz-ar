@@ -50,37 +50,48 @@ export async function getDashboardStats() {
   return { playersCount, questionsCount, bestScore, recentLogs };
 }
 
-// 4. جلب الإعدادات
+// تحديث: جلب الإعدادات (شاملة)
 export async function getGameConfig() {
-  const config = await client.fetch(`*[_type == "gameConfig"][0]`);
-  // قيم افتراضية في حال عدم وجود إعدادات
+  const config = await client.fetch(`*[_type == "gameConfig"][0]{
+    timerDuration, senzuCount, hintCount, isMaintenanceMode,
+    thresholds, texts, theme, sounds
+  }`);
+  
+  // قيم افتراضية قوية
   return config || { 
-    timerDuration: 15, 
-    senzuCount: 1, 
-    hintCount: 1, 
+    timerDuration: 15, senzuCount: 1, hintCount: 1, 
     thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
-    texts: { loadingText: 'جاري التحميل...', winTitle: 'فزت!', loseTitle: 'خسرت...' },
+    texts: { loadingText: '...', winTitle: 'فزت', loseTitle: 'خسرت' },
+    theme: { primaryColor: '#F85B1A', secondaryColor: '#FFD600' },
     isMaintenanceMode: false 
   };
 }
 
-// 5. تحديث الإعدادات (شاملة التحولات والنصوص)
+// تحديث: حفظ الإعدادات (شاملة)
 export async function updateGameConfig(formData: FormData) {
+  // نستخرج البيانات بعناية
   const config = {
     timerDuration: Number(formData.get('timerDuration')),
     senzuCount: Number(formData.get('senzuCount')),
     hintCount: Number(formData.get('hintCount')),
+    isMaintenanceMode: formData.get('isMaintenanceMode') === 'on',
+    
     thresholds: {
       ssj: Number(formData.get('ssjThreshold')),
       blue: Number(formData.get('blueThreshold')),
       ui: Number(formData.get('uiThreshold')),
     },
-    texts: {
-      loadingText: formData.get('loadingText'),
-      winTitle: formData.get('winTitle'),
-      loseTitle: formData.get('loseTitle'),
+    
+    theme: {
+      primaryColor: formData.get('primaryColor') as string,
+      secondaryColor: formData.get('secondaryColor') as string,
     },
-    isMaintenanceMode: formData.get('isMaintenanceMode') === 'on',
+
+    sounds: {
+      clickSound: formData.get('clickSound') as string,
+      correctSound: formData.get('correctSound') as string,
+      winSound: formData.get('winSound') as string,
+    }
   };
 
   const existingConfig = await client.fetch(`*[_type == "gameConfig"][0]._id`);
@@ -90,7 +101,7 @@ export async function updateGameConfig(formData: FormData) {
     await writeClient.create({ _type: 'gameConfig', ...config });
   }
 
-  revalidatePath('/'); 
+  revalidatePath('/'); // تحديث الموقع بالكامل
   return { success: 'تم تحديث قوانين الكون بنجاح!' };
 }
 

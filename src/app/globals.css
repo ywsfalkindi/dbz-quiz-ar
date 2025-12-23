@@ -77,3 +77,19 @@ body {
 .font-cairo {
   font-family: var(--font-cairo), sans-serif;
 }
+
+.input-field {
+  width: 100%;
+  padding: 0.75rem; /* تعادل p-3 */
+  background-color: rgba(0, 0, 0, 0.5); /* تعادل bg-black/50 */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* تعادل border-white/10 */
+  border-radius: 0.5rem; /* تعادل rounded-lg */
+  color: white;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  border-color: var(--primary-color, #F85B1A); /* يستخدم اللون الديناميكي الذي أنشأناه */
+  box-shadow: 0 0 10px rgba(248, 91, 26, 0.2);
+}

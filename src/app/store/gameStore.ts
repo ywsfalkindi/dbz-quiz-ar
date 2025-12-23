@@ -5,11 +5,23 @@ import { Question } from '../actions/gameActions';
 export type SaiyanForm = 'base' | 'kaioken' | 'ssj' | 'blue' | 'ui';
 type GameStatus = 'start' | 'playing' | 'won' | 'lost' | 'maintenance';
 
+// تعريف شكل الإعدادات الجديد والموسع
 interface GameConfig {
   timerDuration: number;
   senzuCount: number;
   hintCount: number;
-  thresholds: { ssj: number; blue: number; ui: number }; // القيم الديناميكية
+  theme?: {
+    primaryColor: string;
+    secondaryColor: string;
+    backgroundImage?: string; // سنخزن الرابط هنا
+  };
+  sounds?: {
+    clickSound?: string;
+    correctSound?: string;
+    wrongSound?: string;
+    winSound?: string;
+  };
+  thresholds: { ssj: number; blue: number; ui: number };
   texts: { loadingText: string; winTitle: string; loseTitle: string };
   isMaintenanceMode: boolean;
 }
@@ -52,11 +64,13 @@ const useGameStore = create<GameState>()(
       questions: [],
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
-      // قيم أولية لحين تحميل الإعدادات الحقيقية
+      
+      // القيم الافتراضية
       config: { 
         timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
         thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
-        texts: { loadingText: '...', winTitle: 'فزت', loseTitle: 'خسرت' }
+        texts: { loadingText: 'جاري التحميل...', winTitle: 'فزت!', loseTitle: 'خسرت...' },
+        theme: { primaryColor: '#F85B1A', secondaryColor: '#FFD600' }
       },
 
       setGameConfig: (config) => set(() => {
@@ -130,15 +144,13 @@ const useGameStore = create<GameState>()(
 
       getSaiyanForm: () => {
         const s = get().score;
-        // هنا التعديل: نستخدم القيم المحفوظة، وإذا لم توجد نستخدم قيماً افتراضية فوراً
         const config = get().config;
-        const t = config?.thresholds || { ssj: 2500, blue: 5000, ui: 8000 }; 
-        
+        const t = config?.thresholds || { ssj: 2500, blue: 5000, ui: 8000 };
         if (s >= t.ui) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' };
         if (s >= t.blue) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
         if (s >= t.ssj) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };
         if (s >= 1000) return { form: 'kaioken', color: '#ef4444', label: 'كايوكين' };
-        return { form: 'base', color: '#F85B1A', label: 'الحالة العادية' };
+        return { form: 'base', color: config.theme?.primaryColor || '#F85B1A', label: 'الحالة العادية' };
       }
     }),
     {
