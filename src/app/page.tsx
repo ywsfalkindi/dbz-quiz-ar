@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useGameStore from './store/gameStore';
 import { fetchGameQuestions, verifyAnswerAction } from './actions/gameActions';
-import { playSound } from './utils/sounds'; // استدعاء الأصوات
+import { playSound } from './utils/sounds';
 
 import HealthBar from './components/HealthBar';
 import QuestionCard from './components/QuestionCard';
 import AnswerButton from './components/AnswerButton';
 import PowerLevel from './components/PowerLevel';
+import GameTimer from './components/GameTimer'; // استدعاء المؤقت الجديد
 
 const StartScreen = ({ onStart }: { onStart: () => void }) => (
   <motion.div
@@ -108,7 +109,6 @@ export default function Home() {
 
   useEffect(() => {
     async function loadQuestions() {
-      // نجلب الأسئلة فقط إذا لم تكن موجودة (للحفاظ على ال persist)
       if (status === 'playing' && questions.length === 0) {
         const fetchedQuestions = await fetchGameQuestions();
         setQuestions(fetchedQuestions);
@@ -125,6 +125,30 @@ export default function Home() {
     resetGame();
   };
 
+  // دالة التعامل مع انتهاء الوقت
+  const handleTimeUp = () => {
+    if (isVerifying || selectedAnswerKey) return; 
+
+    playSound('wrong');
+    setDamageFlash(true);
+    setTimeout(() => setDamageFlash(false), 300);
+    
+    // نرسل false كإجابة خاطئة
+    answerQuestion(false); 
+
+    // الانتقال التلقائي
+    setTimeout(() => {
+       const { currentQuestionIndex: latestIndex, questions: latestQuestions } = useGameStore.getState();
+       if (latestIndex < latestQuestions.length - 1) {
+         nextQuestion();
+       } else {
+         if (useGameStore.getState().health > 0) {
+             setGameWon();
+         }
+       }
+    }, 1500);
+  };
+
   const handleAnswer = async (questionId: string, answerKey: string) => {
     if (isVerifying || selectedAnswerKey) return;
 
@@ -134,27 +158,23 @@ export default function Home() {
 
     const { isCorrect, correctAnswerKey } = await verifyAnswerAction(questionId, answerKey);
     
-    // التعامل مع المؤثرات الصوتية والبصرية
     if (isCorrect) {
       playSound('correct');
     } else {
       playSound('wrong');
       setDamageFlash(true);
-      setTimeout(() => setDamageFlash(false), 300); // وميض سريع
+      setTimeout(() => setDamageFlash(false), 300);
     }
 
     answerQuestion(isCorrect);
     setCorrectAnswerKey(correctAnswerKey);
 
     setTimeout(() => {
-      // Use getState to prevent stale closures
       const { currentQuestionIndex: latestIndex, questions: latestQuestions } = useGameStore.getState();
       
       if (latestIndex < latestQuestions.length - 1) {
-        // إذا بقيت أسئلة
         nextQuestion();
       } else {
-        // انتهت اللعبة (فوز)
         if (useGameStore.getState().health > 0) {
              playSound('win');
              setGameWon();
@@ -198,6 +218,9 @@ export default function Home() {
               <PowerLevel score={score} />
             </div>
 
+            {/* إضافة المؤقت هنا */}
+            <GameTimer onTimeUp={handleTimeUp} /> 
+            
             <QuestionCard question={currentQuestion.title} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
@@ -228,7 +251,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* طبقة الوميض الأحمر عند الضرر */}
       {damageFlash && (
         <div className="fixed inset-0 bg-red-600 opacity-30 pointer-events-none z-50 animate-pulse" />
       )}
