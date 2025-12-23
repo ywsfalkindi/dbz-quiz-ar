@@ -3,12 +3,14 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Question } from '../actions/gameActions';
 
 export type SaiyanForm = 'base' | 'kaioken' | 'ssj' | 'blue' | 'ui';
-type GameStatus = 'start' | 'playing' | 'won' | 'lost' | 'maintenance'; // أضفنا وضع الصيانة
+type GameStatus = 'start' | 'playing' | 'won' | 'lost' | 'maintenance';
 
 interface GameConfig {
   timerDuration: number;
   senzuCount: number;
   hintCount: number;
+  thresholds: { ssj: number; blue: number; ui: number }; // القيم الديناميكية
+  texts: { loadingText: string; winTitle: string; loseTitle: string };
   isMaintenanceMode: boolean;
 }
 
@@ -22,10 +24,10 @@ interface GameState {
   questions: Question[];
   difficultyMultiplier: number;
   inventory: { senzuBeans: number; hints: number };
-  config: GameConfig; // تخزين الإعدادات
+  config: GameConfig;
 
   // Actions
-  setGameConfig: (config: GameConfig) => void; // دالة جديدة
+  setGameConfig: (config: GameConfig) => void;
   setQuestions: (questions: Question[]) => void;
   startGame: () => void;
   resetGame: () => void;
@@ -50,13 +52,15 @@ const useGameStore = create<GameState>()(
       questions: [],
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
-      config: { timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false }, // قيم افتراضية
+      // قيم أولية لحين تحميل الإعدادات الحقيقية
+      config: { 
+        timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
+        thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
+        texts: { loadingText: '...', winTitle: 'فزت', loseTitle: 'خسرت' }
+      },
 
       setGameConfig: (config) => set(() => {
-        // إذا كان وضع الصيانة مفعل، نغير الحالة فوراً
-        if (config.isMaintenanceMode) {
-          return { config, status: 'maintenance' };
-        }
+        if (config.isMaintenanceMode) return { config, status: 'maintenance' };
         return { config };
       }),
 
@@ -64,15 +68,14 @@ const useGameStore = create<GameState>()(
 
       startGame: () => {
         const state = get();
-        // استخدام القيم من الـ Config
         set({ 
           status: 'playing', 
           currentQuestionIndex: 0, 
-          timer: state.config.timerDuration, // استخدام الوقت المخصص
+          timer: state.config.timerDuration, 
           score: 0, 
           health: 100, 
           inventory: { 
-            senzuBeans: state.config.senzuCount, // استخدام عدد السينزو المخصص
+            senzuBeans: state.config.senzuCount, 
             hints: state.config.hintCount 
           } 
         });
@@ -80,9 +83,7 @@ const useGameStore = create<GameState>()(
 
       resetGame: () => set({ status: 'start' }),
 
-      decrementTimer: () => set((state) => ({ 
-        timer: Math.max(0, state.timer - 1) 
-      })),
+      decrementTimer: () => set((state) => ({ timer: Math.max(0, state.timer - 1) })),
 
       useSenzuBean: () => set((state) => {
         if (state.inventory.senzuBeans > 0 && state.health < 100) {
@@ -100,7 +101,6 @@ const useGameStore = create<GameState>()(
 
       answerQuestion: (isCorrect) => set((state) => {
         if (state.status !== 'playing') return {};
-
         if (isCorrect) {
           const streakBonus = state.streak * 50;
           const timeBonus = state.timer * 10;
@@ -110,17 +110,14 @@ const useGameStore = create<GameState>()(
             difficultyMultiplier: state.streak > 0 && state.streak % 5 === 0 ? state.difficultyMultiplier + 1 : state.difficultyMultiplier
           };
         }
-
-        const newHealth = state.health - 25;
         return {
-          health: newHealth,
+          health: state.health - 25,
           streak: 0,
-          status: newHealth <= 0 ? 'lost' : state.status
+          status: state.health - 25 <= 0 ? 'lost' : state.status
         };
       }),
 
       nextQuestion: () => set((state) => {
-        // حساب الوقت بناءً على الصعوبة والوقت الأساسي من الإعدادات
         const baseTime = state.config.timerDuration;
         const newTime = Math.max(5, baseTime - state.difficultyMultiplier);
         return {
@@ -133,9 +130,13 @@ const useGameStore = create<GameState>()(
 
       getSaiyanForm: () => {
         const s = get().score;
-        if (s >= 8000) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' };
-        if (s >= 5000) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
-        if (s >= 2500) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };
+        // هنا التعديل: نستخدم القيم المحفوظة، وإذا لم توجد نستخدم قيماً افتراضية فوراً
+        const config = get().config;
+        const t = config?.thresholds || { ssj: 2500, blue: 5000, ui: 8000 }; 
+        
+        if (s >= t.ui) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' };
+        if (s >= t.blue) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
+        if (s >= t.ssj) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };
         if (s >= 1000) return { form: 'kaioken', color: '#ef4444', label: 'كايوكين' };
         return { form: 'base', color: '#F85B1A', label: 'الحالة العادية' };
       }
@@ -146,4 +147,5 @@ const useGameStore = create<GameState>()(
     }
   )
 );
+
 export default useGameStore;
