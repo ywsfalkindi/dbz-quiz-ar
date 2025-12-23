@@ -8,13 +8,19 @@ const config: Config = {
     extend: {
       colors: {
         dbz: {
-          orange: '#F85B1A', // زي غوكو
-          blue: '#005CAF',   // القميص الداخلي
-          yellow: '#FFD600', // سوبر سايان
-          energy: '#00F0FF', // كامي هامي ها
-          scouter: 'rgba(255, 50, 50, 0.9)', // زجاج الكشاف
+          orange: '#F85B1A',
+          blue: '#005CAF',
+          yellow: '#FFD600',
+          energy: '#00F0FF',
+          scouter: 'rgba(255, 50, 50, 0.9)',
           dark: '#050505',
         }
+      },
+      // إضافة نصوص ذكية (Fluid Typography)
+      fontSize: {
+        'fluid-h1': 'clamp(2.5rem, 8vw, 4.5rem)', // للعنوان الرئيسي
+        'fluid-h2': 'clamp(1.5rem, 5vw, 3rem)',   // للعناوين الفرعية
+        'fluid-p': 'clamp(1rem, 3vw, 1.25rem)',   // للنصوص العادية
       },
       padding: {
         'safe-top': 'env(safe-area-inset-top)',

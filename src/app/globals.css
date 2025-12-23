@@ -5,18 +5,19 @@
   --foreground: #ededed;
 }
 
-/* ضبط ارتفاع الشاشة للموبايل بدقة */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: 'Cairo', Arial, sans-serif;
-  min-height: 100dvh; /* Dynamic Viewport Height */
-  overscroll-behavior: none; /* منع السحب لأسفل */
-  touch-action: manipulation; /* تحسين استجابة اللمس */
+  /* تثبيت الصفحة ومنع التمرير العام */
+  height: 100dvh; 
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
   -webkit-font-smoothing: antialiased;
 }
 
-/* خلفية النجوم المتحركة */
+/* خلفية النجوم */
 .bg-space-pattern {
   background-image: 
     radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
@@ -26,10 +27,33 @@ body {
   background-position: 0 0, 40px 60px, 130px 270px;
 }
 
-/* تأثير الزجاج */
+/* تحسين الزجاج مع إضافة Noise Texture خفيف جداً عبر CSS */
 .glass-panel {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(20, 20, 20, 0.75);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+/* إضافة ملمس خشن (Noise) فوق الزجاج لتقليل تسطح الألوان */
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* إخفاء شريط التمرير (Scrollbar) لجميع المتصفحات لكن السماح بالتمرير */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }

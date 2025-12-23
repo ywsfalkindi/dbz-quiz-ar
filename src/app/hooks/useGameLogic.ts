@@ -4,6 +4,13 @@ import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction } from '.
 import { playSound } from '../utils/sounds';
 import confetti from 'canvas-confetti';
 
+// دالة مساعدة للاهتزاز (تعمل فقط على الهواتف)
+const vibrateDevice = (pattern: number | number[]) => {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
+};
+
 export const useGameLogic = () => {
   const store = useGameStore();
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
@@ -23,24 +30,27 @@ export const useGameLogic = () => {
     loadQuestions();
   }, [store.status, store.questions.length, store]);
 
-  // تصفير المخفي عند السؤال الجديد
+  // تصفير الإجابات المخفية عند كل سؤال جديد
   useEffect(() => {
     setHiddenAnswers([]);
   }, [store.currentQuestionIndex]);
 
   const handleStart = () => {
     playSound('click');
+    vibrateDevice(50); // اهتزاز خفيف
     store.startGame();
   };
 
   const handleRestart = () => {
     playSound('click');
+    vibrateDevice(50);
     store.resetGame();
   };
 
   const handleUseSenzu = () => {
     if (store.inventory.senzuBeans > 0 && store.health < 100) {
       playSound('correct'); // صوت الشفاء
+      vibrateDevice([50, 50, 50]); // نبضات شفاء
       store.useSenzuBean();
     }
   };
@@ -50,7 +60,8 @@ export const useGameLogic = () => {
     if (store.inventory.hints > 0 && hiddenAnswers.length === 0 && currentQuestion && !isVerifying) {
       const wrongKeys = await getWrongAnswersAction(currentQuestion._id);
       if (wrongKeys.length > 0) {
-        playSound('click'); // صوت التكنولوجيا
+        playSound('click'); 
+        vibrateDevice(50);
         setHiddenAnswers(wrongKeys);
         store.decrementHint();
       }
@@ -76,20 +87,13 @@ export const useGameLogic = () => {
   const triggerWinConfetti = () => {
       const duration = 3000;
       const end = Date.now() + duration;
-
       (function frame() {
         confetti({
-          particleCount: 5,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
+          particleCount: 5, angle: 60, spread: 55, origin: { x: 0 },
           colors: ['#F85B1A', '#FFD600', '#00F0FF']
         });
         confetti({
-          particleCount: 5,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
+          particleCount: 5, angle: 120, spread: 55, origin: { x: 1 },
            colors: ['#F85B1A', '#FFD600', '#00F0FF']
         });
         if (Date.now() < end) {
@@ -101,9 +105,9 @@ export const useGameLogic = () => {
   const handleTimeUp = () => {
     if (isVerifying || selectedAnswerKey) return;
     playSound('wrong');
+    vibrateDevice([100, 50, 100, 50, 100]); // اهتزاز قوي للخسارة
     setDamageFlash(true);
-    setTimeout(() => setDamageFlash(false), 500); // اهتزاز أطول
-    
+    setTimeout(() => setDamageFlash(false), 500);
     store.answerQuestion(false); 
     setTimeout(triggerNextStep, 1500);
   };
@@ -112,6 +116,7 @@ export const useGameLogic = () => {
     if (isVerifying || selectedAnswerKey) return;
     
     playSound('click');
+    vibrateDevice(20);
     setIsVerifying(true);
     setSelectedAnswerKey(answerKey);
 
@@ -119,15 +124,14 @@ export const useGameLogic = () => {
     
     if (isCorrect) {
       playSound('correct');
-      // تأثير الجزيئات عند الإجابة الصحيحة
+      vibrateDevice([50, 30, 50]); // اهتزاز "نجاح"
       confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.7 },
+        particleCount: 100, spread: 70, origin: { y: 0.7 },
         colors: ['#22c55e', '#FFD600']
       });
     } else {
       playSound('wrong');
+      vibrateDevice([100, 100, 100]); // اهتزاز "خطأ"
       setDamageFlash(true);
       setTimeout(() => setDamageFlash(false), 500);
     }
@@ -139,17 +143,9 @@ export const useGameLogic = () => {
 
   return {
     ...store,
-    selectedAnswerKey,
-    isVerifying,
-    correctAnswerKey,
-    damageFlash,
-    hiddenAnswers,
-    handleStart,
-    handleRestart,
-    handleUseSenzu,
-    handleUseHint,
-    handleTimeUp,
-    handleAnswer,
-    saiyanForm: store.getSaiyanForm() // جلب حالة التحول
+    selectedAnswerKey, isVerifying, correctAnswerKey,
+    damageFlash, hiddenAnswers,
+    handleStart, handleRestart, handleUseSenzu, handleUseHint, handleTimeUp, handleAnswer,
+    saiyanForm: store.getSaiyanForm()
   };
 };
