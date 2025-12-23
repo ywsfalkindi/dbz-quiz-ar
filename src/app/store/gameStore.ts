@@ -10,6 +10,9 @@ interface GameState {
   status: GameStatus
   answerQuestion: (isCorrect: boolean) => void
   resetGame: () => void
+  startGame: () => void
+  nextQuestion: () => void
+  setGameWon: () => void
 }
 
 const useGameStore = create<GameState>((set) => ({
