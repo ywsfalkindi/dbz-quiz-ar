@@ -1,6 +1,9 @@
 'use server';
-
+import { z } from 'zod'; 
+import { headers } from 'next/headers';
 import { client } from '@/../sanity/lib/client';
+
+const rateLimitMap = new Map<string, number>();
 
 // Interface for answers as they are stored in Sanity (including isCorrect)
 interface SanityAnswer {
@@ -77,10 +80,42 @@ export const fetchGameQuestions = async (): Promise<Question[]> => {
  * @returns A promise that resolves to an object containing whether the answer was correct,
  * the key of the correct answer, and the explanation.
  */
+
+const verifyAnswerSchema = z.object({
+  questionId: z.string().min(1, "معرف السؤال مطلوب"),
+  answerKey: z.string().min(1, "معرف الإجابة مطلوب"),
+});
+
 export const verifyAnswerAction = async (
   questionId: string,
   answerKey: string
 ): Promise<{ isCorrect: boolean; correctAnswerKey: string; explanation: string | null }> => {
+  
+  const ip = (await headers()).get("x-forwarded-for") || "unknown";
+  const now = Date.now();
+  const lastRequestTime = rateLimitMap.get(ip) || 0;
+  
+  // السماح بطلب واحد كل 500 مللي ثانية (نصف ثانية)
+  if (now - lastRequestTime < 500) {
+     return { 
+      isCorrect: false, 
+      correctAnswerKey: '', 
+      explanation: 'أنت سريع جداً! هدئ من روعك يا غوكو (انتظر قليلاً).' 
+    };
+  }
+  
+  rateLimitMap.set(ip, now);
+  // --- بداية الكود الجديد (التحقق) ---
+  const result = verifyAnswerSchema.safeParse({ questionId, answerKey });
+
+  if (!result.success) {
+    console.error("Validation Error:", result.error);
+    return { 
+      isCorrect: false, 
+      correctAnswerKey: '', 
+      explanation: 'بيانات غير صالحة! هل تحاول خداع زين-أوه؟' 
+    };
+  }
   try {
     // Fetch the question with the full answer data for verification
     const question = await client.fetch<SanityQuestion>(
