@@ -1,80 +1,47 @@
 'use client'
 import { motion } from 'framer-motion';
-import { useEffect } from 'react';
 
 interface AnswerButtonProps {
   answer: string;
   onClick: () => void;
   isCorrect: boolean | null; 
   disabled?: boolean;
-  isHidden?: boolean; 
+  isHidden?: boolean;
 }
 
 export default function AnswerButton({ answer, onClick, isCorrect, disabled, isHidden }: AnswerButtonProps) {
-
-  // ✅ 1. الـ Hook دائماً في القمة وبدون أي شروط تسبقه نهائياً
-  useEffect(() => {
-    // نضع المنطق بالداخل: لا تهتز إذا كان الزر مخفياً أو إذا كانت الإجابة لم تُحدد بعد
-    if (!isHidden && isCorrect === false && typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(200);
-    }
-  }, [isCorrect, isHidden]);
-
-  // ✅ 2. تعريف المتغيرات (يجب أن تسبق الـ return)
-  const buttonVariants = {
-    rest: {
-      scale: 1,
-      boxShadow: '0 0 10px rgba(0, 255, 0, 0.5)',
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      color: '#34d399', 
-    },
-    hover: {
-      scale: 1.05,
-      boxShadow: '0 0 20px rgba(0, 255, 0, 0.8)',
-    },
-    tap: {
-      scale: 0.95,
-    },
-    correct: {
-      backgroundColor: '#22c55e', 
-      color: '#ffffff',
-      scale: 1.0,
-      transition: { duration: 0.5 },
-    },
-    incorrect: {
-      backgroundColor: '#ef4444', 
-      color: '#ffffff',
-      x: [0, -10, 10, -10, 10, 0], 
-      transition: { duration: 0.5 },
-    },
-    disabled: {
-        opacity: 0.6,
-    }
+  
+  const getBackgroundColor = () => {
+    if (isCorrect === true) return 'rgba(34, 197, 94, 0.9)'; // Green
+    if (isCorrect === false) return 'rgba(239, 68, 68, 0.9)'; // Red
+    return 'rgba(255, 255, 255, 0.05)'; // Default Glass
   };
 
-  const getAnimateState = () => {
-    if (isCorrect === true) return 'correct';
-    if (isCorrect === false) return 'incorrect';
-    if (disabled) return 'disabled';
-    return 'rest';
+  const getBorderColor = () => {
+    if (isCorrect === true) return '#22c55e';
+    if (isCorrect === false) return '#ef4444';
+    return 'rgba(255, 255, 255, 0.2)';
   };
 
-  // ✅ 3. الـ return الوحيد في نهاية الدالة
-  // نستخدم كلاس 'invisible' و 'pointer-events-none' لإخفاء الزر ومنع الضغط عليه
   return (
     <motion.button
-      variants={buttonVariants}
-      initial="rest"
-      animate={getAnimateState()}
-      whileHover={(disabled || isHidden) ? "" : "hover"}
-      whileTap={(disabled || isHidden) ? "" : "tap"}
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: isHidden ? 0 : 1, x: 0 }}
+      whileHover={!disabled && !isHidden ? { scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.1)' } : {}}
+      whileTap={!disabled && !isHidden ? { scale: 0.98 } : {}}
       onClick={onClick}
       disabled={disabled || isHidden}
-      className={`w-full p-4 my-2 text-xl font-bold border-2 border-green-500 rounded-lg focus:outline-none transition-all ${
-        isHidden ? 'invisible pointer-events-none' : 'visible'
-      }`}
+      className={`w-full p-5 my-2 text-lg md:text-xl font-bold rounded-xl text-white backdrop-blur-sm transition-colors relative overflow-hidden group
+      ${isHidden ? 'pointer-events-none' : 'cursor-pointer'}`}
+      style={{
+        backgroundColor: getBackgroundColor(),
+        border: `1px solid ${getBorderColor()}`,
+        boxShadow: isCorrect === true ? '0 0 20px rgba(34, 197, 94, 0.4)' : 'none'
+      }}
     >
-      {answer}
+        {/* زخرفة تقنية بسيطة */}
+        <span className="absolute left-0 top-0 bottom-0 w-1 bg-white/10 group-hover:bg-dbz-energy transition-colors" />
+        {answer}
     </motion.button>
   );
 }

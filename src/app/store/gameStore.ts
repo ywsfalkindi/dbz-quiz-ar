@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Question } from '../actions/gameActions';
 
+export type SaiyanForm = 'base' | 'kaioken' | 'ssj' | 'blue' | 'ui';
+
 type GameStatus = 'start' | 'playing' | 'won' | 'lost';
 
 interface GameState {
@@ -12,12 +14,12 @@ interface GameState {
   timer: number;
   status: GameStatus;
   questions: Question[];
-  // --- إضافة جديدة: المخزون ---
   inventory: {
     senzuBeans: number;
     hints: number;
   };
-  // ---------------------------
+  
+  // Actions
   answerQuestion: (isCorrect: boolean) => void;
   resetGame: () => void;
   startGame: () => void;
@@ -25,15 +27,16 @@ interface GameState {
   decrementTimer: () => void;
   setGameWon: () => void;
   setQuestions: (questions: Question[]) => void;
-  // --- إضافة جديدة: دوال القوى ---
   useSenzuBean: () => void;
   decrementHint: () => void;
-  // -----------------------------
+  
+  // Helpers
+  getSaiyanForm: () => { form: SaiyanForm; color: string; label: string };
 }
 
 const useGameStore = create<GameState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       score: 0,
       health: 100,
       streak: 0,
@@ -41,10 +44,9 @@ const useGameStore = create<GameState>()(
       timer: 15,
       status: 'start',
       questions: [],
-      // --- المخزون الابتدائي ---
       inventory: {
-        senzuBeans: 1, // حبة واحدة
-        hints: 1,      // تلميح واحد
+        senzuBeans: 1,
+        hints: 1,
       },
 
       setQuestions: (questions: Question[]) => set({ questions }),
@@ -53,7 +55,6 @@ const useGameStore = create<GameState>()(
         timer: Math.max(0, state.timer - 1) 
       })),
 
-      // دالة استخدام حبة السينزو
       useSenzuBean: () => set((state) => {
         if (state.inventory.senzuBeans > 0 && state.health < 100) {
           return {
@@ -64,13 +65,12 @@ const useGameStore = create<GameState>()(
         return {};
       }),
 
-      // دالة خصم التلميح
       decrementHint: () => set((state) => {
          if (state.inventory.hints > 0) {
           return {
             inventory: { ...state.inventory, hints: state.inventory.hints - 1 }
           };
-         }
+        }
          return {};
       }),
 
@@ -79,11 +79,10 @@ const useGameStore = create<GameState>()(
           if (state.status !== 'playing') return {};
 
           if (isCorrect) {
-            const timeBonus = state.timer * 2;
-            const streakBonus = state.streak * 5;
-
+            const timeBonus = state.timer * 10;
+            const streakBonus = state.streak * 50;
             return {
-              score: state.score + 10 + streakBonus + timeBonus,
+              score: state.score + 100 + streakBonus + timeBonus,
               streak: state.streak + 1,
             };
           }
@@ -105,7 +104,6 @@ const useGameStore = create<GameState>()(
           timer: 15,
           status: 'start',
           questions: [],
-          // --- إعادة المخزون ---
           inventory: { senzuBeans: 1, hints: 1 },
         }),
 
@@ -117,6 +115,16 @@ const useGameStore = create<GameState>()(
       })),
 
       setGameWon: () => set({ status: 'won' }),
+
+      // منطق التحولات بناءً على النقاط
+      getSaiyanForm: () => {
+        const s = get().score;
+        if (s >= 8000) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' }; // الغريزة الفائقة
+        if (s >= 5000) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
+        if (s >= 2500) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };
+        if (s >= 1000) return { form: 'kaioken', color: '#ef4444', label: 'كايوكين' };
+        return { form: 'base', color: '#F85B1A', label: 'الحالة العادية' };
+      }
     }),
     {
       name: 'dbz-game-storage',
