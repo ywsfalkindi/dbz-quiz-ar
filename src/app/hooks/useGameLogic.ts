@@ -1,11 +1,11 @@
-// src/app/hooks/useGameLogic.ts
 import { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
 import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction, getGameConfig } from '../actions/gameActions';
-import useSound from '../../hooks/useSound';
+// لاحظ: نستورد الهوك الجديد الذي أنشأناه للتو
+import useSound from '../../hooks/useSound'; 
 import confetti from 'canvas-confetti';
 
-// دالة اهتزاز الهاتف
+// وظيفة لاهتزاز الهاتف لإضافة شعور بالحماس (تعمل على الجوال فقط)
 const vibrateDevice = (pattern: number | number[]) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(pattern);
@@ -14,15 +14,17 @@ const vibrateDevice = (pattern: number | number[]) => {
 
 export const useGameLogic = () => {
   const store = useGameStore();
-  const playSound = useSound(); // تفعيل نظام الصوت الجديد
+  const playSound = useSound(); // تفعيل نظام الصوت
+
+  // حالات محلية للتحكم في التفاعل اللحظي
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
-  const [damageFlash, setDamageFlash] = useState(false);
-  const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]);
+  const [damageFlash, setDamageFlash] = useState(false); // ومضة حمراء عند الخطأ
+  const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]); // للإجابات المحذوفة (زر كايو)
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
-  // 1. تحميل الإعدادات
+  // 1. تحميل إعدادات اللعبة من السيرفر عند الفتح
   useEffect(() => {
     async function initGame() {
       const config = await getGameConfig();
@@ -33,7 +35,7 @@ export const useGameLogic = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. تحميل الأسئلة
+  // 2. تحميل الأسئلة فقط عندما تبدأ اللعبة
   useEffect(() => {
     async function loadQuestions() {
       if (store.status === 'playing' && store.questions.length === 0) {
@@ -45,10 +47,12 @@ export const useGameLogic = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.status, store.questions.length]);
 
-  // تصفير الإجابات المخفية
+  // تصفير المساعدات (حذف إجابتين) عند كل سؤال جديد
   useEffect(() => {
     setHiddenAnswers([]);
   }, [store.currentQuestionIndex]);
+
+  // --- دوال التحكم ---
 
   const handleStart = () => {
     if (!isConfigLoaded) return;
@@ -64,6 +68,7 @@ export const useGameLogic = () => {
   };
 
   const handleUseSenzu = () => {
+    // شرط استخدام حبة السينزو: لديك مخزون + طاقتك ليست كاملة
     if (store.inventory.senzuBeans > 0 && store.health < 100) {
       playSound('correct');
       vibrateDevice([50, 50, 50]);
@@ -73,6 +78,7 @@ export const useGameLogic = () => {
 
   const handleUseHint = async () => {
     const currentQuestion = store.questions[store.currentQuestionIndex];
+    // شرط استخدام المساعدة: لديك رصيد + لم تستخدمها بعد + السؤال موجود
     if (store.inventory.hints > 0 && hiddenAnswers.length === 0 && currentQuestion && !isVerifying) {
       const wrongKeys = await getWrongAnswersAction(currentQuestion._id);
       if (wrongKeys.length > 0) {
@@ -84,22 +90,32 @@ export const useGameLogic = () => {
     }
   };
 
+  // --- المنطق الحساس: الانتقال للسؤال التالي ---
   const triggerNextStep = () => {
     const { currentQuestionIndex, questions, health } = useGameStore.getState();
+    
+    // [تصحيح الخطأ القاتل]: نتحقق أولاً هل ما زال هناك أسئلة؟
+    // إذا كان الترتيب الحالي أقل من (عدد الأسئلة - 1)، فهذا يعني بقي أسئلة.
     if (currentQuestionIndex < questions.length - 1) {
-      store.nextQuestion();
+      store.nextQuestion(); // انتقل للسؤال التالي
     } else {
+      // وصلنا للنهاية!
       if (health > 0) {
+        // إذا كانت الصحة جيدة، إذن اللاعب فاز
         playSound('win');
         triggerWinConfetti();
-        store.setGameWon();
+        store.setGameWon(); // إنهاء اللعبة بالفوز
+        // هام: لا نستدعي nextQuestion هنا، لكي لا يخرج الفهرس عن النطاق
       }
     }
+
+    // تصفير الحالات للسؤال الجديد
     setSelectedAnswerKey(null);
     setIsVerifying(false);
     setCorrectAnswerKey(null);
   };
 
+  // تأثير الاحتفال (قصاصات ورقية)
   const triggerWinConfetti = () => {
     const duration = 3000;
     const end = Date.now() + duration;
@@ -120,21 +136,30 @@ export const useGameLogic = () => {
     if (isVerifying || selectedAnswerKey) return;
     playSound('wrong');
     vibrateDevice([100, 50, 100, 50, 100]);
-    setDamageFlash(true);
+    setDamageFlash(true); // تأثير الضرر
     setTimeout(() => setDamageFlash(false), 500);
-    store.answerQuestion(false); 
-    setTimeout(triggerNextStep, 1500);
+    
+    store.answerQuestion(false); // احتساب إجابة خاطئة
+    
+    // التحقق فوراً: هل مات اللاعب؟
+    const { health } = useGameStore.getState();
+    if (health > 0) {
+        setTimeout(triggerNextStep, 1500); // انتقل للسؤال التالي بعد قليل
+    }
+    // إذا مات، المتجر (store) سيتكفل بتحويل الحالة إلى 'lost'
   };
 
   const handleAnswer = async (questionId: string, answerKey: string) => {
-    if (isVerifying || selectedAnswerKey) return;
+    if (isVerifying || selectedAnswerKey) return; // منع الضغط المزدوج
     
     playSound('click');
     vibrateDevice(20);
     setIsVerifying(true);
     setSelectedAnswerKey(answerKey);
 
+    // التحقق من السيرفر (Server Action) لمنع الغش
     const { isCorrect, correctAnswerKey } = await verifyAnswerAction(questionId, answerKey);
+    
     if (isCorrect) {
       playSound('correct');
       vibrateDevice([50, 30, 50]);
@@ -151,7 +176,12 @@ export const useGameLogic = () => {
 
     store.answerQuestion(isCorrect);
     setCorrectAnswerKey(correctAnswerKey);
-    setTimeout(triggerNextStep, 2000);
+
+    // التحقق من حالة الخسارة قبل الانتقال
+    const { health } = useGameStore.getState();
+    if (health > 0 || isCorrect) {
+         setTimeout(triggerNextStep, 2000);
+    }
   };
 
   return {

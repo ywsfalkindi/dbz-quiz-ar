@@ -1,4 +1,3 @@
-// src/app/store/gameStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Question } from '../actions/gameActions';
@@ -64,6 +63,7 @@ const useGameStore = create<GameState>()(
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
       
+      // الإعدادات الافتراضية (عربية 100%)
       config: { 
         timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
         thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
@@ -144,10 +144,13 @@ const useGameStore = create<GameState>()(
         const s = get().score;
         const config = get().config;
         const t = config?.thresholds || { ssj: 2500, blue: 5000, ui: 8000 };
+        
+        // التحولات مع مسميات عربية
         if (s >= t.ui) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' };
         if (s >= t.blue) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
         if (s >= t.ssj) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };
         if (s >= 1000) return { form: 'kaioken', color: '#ef4444', label: 'كايوكين' };
+        
         return { form: 'base', color: config.theme?.primaryColor || '#F85B1A', label: 'الحالة العادية' };
       }
     }),
@@ -157,4 +160,5 @@ const useGameStore = create<GameState>()(
     }
   )
 );
+
 export default useGameStore;

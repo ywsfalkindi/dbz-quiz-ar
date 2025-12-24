@@ -1,7 +1,6 @@
-// src/app/components/screens/GameScreen.tsx
 'use client';
 import { motion } from 'framer-motion';
-import GameSkeleton from '../GameSkeleton';
+import GameSkeleton from '../GameSkeleton'; // تأكد أن هذا الملف موجود كما هو في مشروعك
 import HealthBar from '../HealthBar';
 import CharacterAvatar from '../CharacterAvatar';
 import GameTimer from '../GameTimer';
@@ -30,8 +29,15 @@ interface GameScreenProps {
 }
 
 export default function GameScreen(props: GameScreenProps) {
+  
+  // [حماية]: إذا كانت البيانات قيد التحميل أو السؤال غير موجود، اعرض شاشة التحميل
+  // هذا يمنع الشاشة البيضاء أو التوقف المفاجئ
   if (props.isLoading || !props.question) {
-    return <div className="p-6 h-full flex items-center"><GameSkeleton /></div>;
+    return (
+        <div className="p-6 h-full flex items-center justify-center">
+            <GameSkeleton />
+        </div>
+    );
   }
 
   return (
@@ -41,20 +47,22 @@ export default function GameScreen(props: GameScreenProps) {
       exit={{ opacity: 0 }}
       className="flex flex-col h-full w-full max-w-3xl mx-auto"
     >
-      {/* 1. الشريط العلوي */}
+      {/* 1. الشريط العلوي (الهيدر) */}
       <div className="shrink-0 px-4 pt-safe-top pb-2 z-10 bg-linear-to-b from-black/80 to-transparent">
         <div className="flex justify-between items-end gap-4">
           <div className="flex-1"><HealthBar health={props.health} /></div>
           <CharacterAvatar form={props.saiyanForm} />
         </div>
+        
         <GameTimer onTimeUp={props.onTimeUp} />
-        <div className="flex justify-between w-full text-sm font-mono text-dbz-energy px-2">
+        
+        <div className="flex justify-between w-full text-sm font-mono text-dbz-energy px-2 mt-1" dir="rtl">
           <span>الطاقة: {props.score}</span>
           <span>المعركة: {props.currentQuestionIndex + 1} من {props.totalQuestions}</span>
         </div>
       </div>
 
-      {/* 2. منطقة السؤال */}
+      {/* 2. منطقة السؤال (قابلة للتمرير إذا كان السؤال طويلاً) */}
       <div className="flex-1 overflow-y-auto px-4 py-2 scrollbar-hide relative">
         <QuestionCard 
           question={props.question.title} 
@@ -62,8 +70,10 @@ export default function GameScreen(props: GameScreenProps) {
           borderColor={props.saiyanForm.color} 
         />
         
+        {/* شبكة الأزرار */}
         <div className="grid grid-cols-1 gap-3 pb-4">
           {props.question.answers.map((ans) => {
+            // منطق تحديد لون الزر (صح/خطأ)
             let state: boolean | null = null;
             if (props.selectedAnswerKey) {
               if (ans._key === props.correctAnswerKey) state = true;
@@ -83,28 +93,36 @@ export default function GameScreen(props: GameScreenProps) {
         </div>
       </div>
 
-      {/* 3. شريط الأدوات */}
+      {/* 3. شريط الأدوات (حبوب السينزو والتلميحات) */}
       <div className="shrink-0 px-4 pb-safe-bottom pt-2 bg-linear-to-t from-black via-black/90 to-transparent z-20">
         <div className="glass-panel mx-auto mb-4 p-3 rounded-2xl flex justify-center gap-6 max-w-sm">
-          {/* زر السينزو */}
+          
+          {/* زر السينزو (تعويض الصحة) */}
           <button
             onClick={props.onUseSenzu}
             disabled={props.inventory.senzuBeans === 0 || props.health === 100}
-            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all border-2 active:scale-90 ${props.inventory.senzuBeans > 0 && props.health < 100 ? 'bg-green-600 border-green-400 shadow-lg' : 'bg-gray-800 border-gray-600 opacity-50'}`}
+            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all border-2 active:scale-90 ${props.inventory.senzuBeans > 0 && props.health < 100 ?
+              'bg-green-600 border-green-400 shadow-lg cursor-pointer' : 'bg-gray-800 border-gray-600 opacity-50 cursor-not-allowed'}`}
           >
             <span className="text-2xl">💊</span>
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{props.inventory.senzuBeans}</span>
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                {props.inventory.senzuBeans}
+            </span>
           </button>
 
-          {/* زر التلميح */}
+          {/* زر الرادار (حذف إجابتين) */}
           <button
             onClick={props.onUseHint}
             disabled={props.inventory.hints === 0 || props.hiddenAnswers.length > 0}
-            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all border-2 active:scale-90 ${props.inventory.hints > 0 && props.hiddenAnswers.length === 0 ? 'bg-blue-600 border-blue-400 shadow-lg' : 'bg-gray-800 border-gray-600 opacity-50'}`}
+            className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all border-2 active:scale-90 ${props.inventory.hints > 0 && props.hiddenAnswers.length === 0 ?
+              'bg-blue-600 border-blue-400 shadow-lg cursor-pointer' : 'bg-gray-800 border-gray-600 opacity-50 cursor-not-allowed'}`}
           >
             <span className="text-2xl">📡</span>
-            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">{props.inventory.hints}</span>
+            <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                {props.inventory.hints}
+            </span>
           </button>
+
         </div>
       </div>
     </motion.div>
