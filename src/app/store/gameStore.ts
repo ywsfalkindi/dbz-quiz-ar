@@ -36,7 +36,6 @@ interface GameState {
   difficultyMultiplier: number;
   inventory: { senzuBeans: number; hints: number };
   config: GameConfig;
-
   setGameConfig: (config: GameConfig) => void;
   setQuestions: (questions: Question[]) => void;
   startGame: () => void;
@@ -45,6 +44,7 @@ interface GameState {
   nextQuestion: () => void;
   decrementTimer: () => void;
   setGameWon: () => void;
+  setGameLost: () => void; // دالة جديدة لضبط الخسارة صراحة
   useSenzuBean: () => void;
   decrementHint: () => void;
   getSaiyanForm: () => { form: SaiyanForm; color: string; label: string };
@@ -63,11 +63,15 @@ const useGameStore = create<GameState>()(
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
       
-      // الإعدادات الافتراضية (عربية 100%)
+      // الإعدادات الافتراضية المعربة بالكامل
       config: { 
         timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
         thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
-        texts: { loadingText: 'جاري تجميع الطاقة...', winTitle: 'انتصار أسطوري!', loseTitle: 'هزيمة مؤلمة...' },
+        texts: { 
+            loadingText: 'جاري استجماع طاقة الكي...', 
+            winTitle: 'انتصار أسطوري!', 
+            loseTitle: 'تمت هزيمتك...' 
+        },
         theme: { primaryColor: '#F85B1A', secondaryColor: '#FFD600' }
       },
 
@@ -85,7 +89,8 @@ const useGameStore = create<GameState>()(
           currentQuestionIndex: 0, 
           timer: state.config.timerDuration, 
           score: 0, 
-          health: 100, 
+          health: 100,
+          streak: 0, // تصفير التتابع
           inventory: { 
             senzuBeans: state.config.senzuCount, 
             hints: state.config.hintCount 
@@ -113,24 +118,32 @@ const useGameStore = create<GameState>()(
 
       answerQuestion: (isCorrect) => set((state) => {
         if (state.status !== 'playing') return {};
+        
         if (isCorrect) {
           const streakBonus = state.streak * 50;
           const timeBonus = state.timer * 10;
+          // زيادة مضاعف الصعوبة كل 5 إجابات صحيحة متتالية
+          const newMultiplier = (state.streak + 1) % 5 === 0 ? state.difficultyMultiplier + 1 : state.difficultyMultiplier;
+          
           return {
             score: state.score + 100 + streakBonus + timeBonus,
             streak: state.streak + 1,
-            difficultyMultiplier: state.streak > 0 && state.streak % 5 === 0 ? state.difficultyMultiplier + 1 : state.difficultyMultiplier
+            difficultyMultiplier: newMultiplier
+          };
+        } else {
+          const newHealth = Math.max(0, state.health - 25); // خصم 25% من الصحة
+          return {
+            health: newHealth,
+            streak: 0,
+            // إذا وصلت الصحة لصفر، تنتهي اللعبة فوراً
+            status: newHealth <= 0 ? 'lost' : state.status 
           };
         }
-        return {
-          health: state.health - 25,
-          streak: 0,
-          status: state.health - 25 <= 0 ? 'lost' : state.status
-        };
       }),
 
       nextQuestion: () => set((state) => {
         const baseTime = state.config.timerDuration;
+        // تقليل الوقت كلما زادت الصعوبة (بحد أدنى 5 ثواني)
         const newTime = Math.max(5, baseTime - state.difficultyMultiplier);
         return {
           currentQuestionIndex: state.currentQuestionIndex + 1,
@@ -139,13 +152,14 @@ const useGameStore = create<GameState>()(
       }),
 
       setGameWon: () => set({ status: 'won' }),
+      setGameLost: () => set({ status: 'lost' }),
 
       getSaiyanForm: () => {
         const s = get().score;
         const config = get().config;
         const t = config?.thresholds || { ssj: 2500, blue: 5000, ui: 8000 };
         
-        // التحولات مع مسميات عربية
+        // التحولات ومسمياتها العربية
         if (s >= t.ui) return { form: 'ui', color: '#ffffff', label: 'الغريزة الفائقة' };
         if (s >= t.blue) return { form: 'blue', color: '#00F0FF', label: 'سوبر سايان بلو' };
         if (s >= t.ssj) return { form: 'ssj', color: '#FFD600', label: 'سوبر سايان' };

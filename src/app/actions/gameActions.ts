@@ -1,14 +1,13 @@
-// src/app/actions/gameActions.ts
 'use server';
 
 import { z } from 'zod'; 
 import { headers } from 'next/headers';
 import { client } from '@/../sanity/lib/client';
-import { createClient } from 'next-sanity'; // للكتابة
+import { createClient } from 'next-sanity';
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
-// إعداد عميل الكتابة (لحفظ النتائج)
+// عميل الكتابة
 const writeClient = createClient({
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET,
@@ -17,7 +16,6 @@ const writeClient = createClient({
   useCdn: false,
 });
 
-// إعداد Redis للحماية (اختياري حسب توفره)
 const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
@@ -30,7 +28,6 @@ const ratelimit = redis
       limiter: Ratelimit.slidingWindow(10, "10 s"),
     }) : null;
 
-// الأنواع
 interface SanityImage {
   _type: 'image';
   asset: { _ref: string; _type: 'reference'; };
@@ -52,7 +49,6 @@ export interface Question {
   answers: { _key: string; answer: string }[];
 }
 
-// 1. جلب الأسئلة (مع منع التخزين المؤقت)
 export const fetchGameQuestions = async (): Promise<Question[]> => {
   const questions = await client.fetch<SanityQuestion[]>(
     `*[_type == "question"]{
@@ -63,31 +59,28 @@ export const fetchGameQuestions = async (): Promise<Question[]> => {
       answers[]{ _key, answer }
     }`,
     {},
-    { cache: 'no-store' } // إصلاح: يجبر السيرفر على جلب بيانات جديدة
+    { cache: 'no-store' } 
   );
-
   return questions.sort(() => Math.random() - 0.5).map(q => ({
     ...q,
     answers: q.answers || [],
   }));
 };
 
-// 2. التحقق من الإجابة (آمن)
 const verifyAnswerSchema = z.object({
   questionId: z.string(),
   answerKey: z.string(),
 });
 
 export const verifyAnswerAction = async (questionId: string, answerKey: string) => {
-  // حماية من الهجمات المتكررة
   if (ratelimit) {
     const ip = (await headers()).get("x-forwarded-for") || "unknown";
     const { success } = await ratelimit.limit(ip);
-    if (!success) return { isCorrect: false, correctAnswerKey: '', explanation: 'هدئ سرعتك أيها المحارب!' };
+    if (!success) return { isCorrect: false, correctAnswerKey: '', explanation: 'هدئ سرعتك أيها المحارب! حاول ببطء أكثر.' };
   }
 
   const validation = verifyAnswerSchema.safeParse({ questionId, answerKey });
-  if (!validation.success) return { isCorrect: false, correctAnswerKey: '', explanation: 'خطأ في البيانات' };
+  if (!validation.success) return { isCorrect: false, correctAnswerKey: '', explanation: 'بيانات غير صحيحة' };
 
   try {
     const question = await client.fetch<SanityQuestion>(
@@ -104,14 +97,13 @@ export const verifyAnswerAction = async (questionId: string, answerKey: string) 
     return {
       isCorrect: selected.isCorrect === true,
       correctAnswerKey: correct._key,
-      explanation: question.explanation || 'لا يوجد شرح إضافي.',
+      explanation: question.explanation || 'لا يوجد شرح إضافي لهذا السؤال.',
     };
   } catch {
-    return { isCorrect: false, correctAnswerKey: '', explanation: 'حدث خطأ تقني.' };
+    return { isCorrect: false, correctAnswerKey: '', explanation: 'حدث خطأ تقني في الاتصال بكوكب كاي.' };
   }
 };
 
-// 3. جلب الإجابات الخاطئة (للتلميح)
 export const getWrongAnswersAction = async (questionId: string): Promise<string[]> => {
   try {
     const question = await client.fetch<SanityQuestion>(
@@ -128,18 +120,13 @@ export const getWrongAnswersAction = async (questionId: string): Promise<string[
   } catch { return []; }
 };
 
-// 4. حفظ النتيجة (مع التحقق الأمني)
 export const submitScoreAction = async (playerName: string, score: number) => {
   if (!process.env.SANITY_API_WRITE_TOKEN) return;
-
-  // إصلاح أمني: التحقق من أن النتيجة منطقية
-  // نفترض أن أقصى درجة منطقية هي 25000 (يمكنك تعديلها)
-  if (score > 25000 || score < 0) {
-    console.error(`محاولة غش محتملة من اللاعب ${playerName} بنتيجة ${score}`);
+  if (score > 50000 || score < 0) {
+    console.error(`محاولة تلاعب مشبوهة من ${playerName}`);
     return; 
   }
 
-  // تنظيف الاسم (Sanitization)
   const cleanName = playerName.replace(/[^a-zA-Z0-9\u0600-\u06FF ]/g, "").substring(0, 20);
 
   try {
@@ -154,7 +141,6 @@ export const submitScoreAction = async (playerName: string, score: number) => {
   }
 };
 
-// 5. جلب المتصدرين
 export const getLeaderboardAction = async () => {
   try {
     return await client.fetch(`
@@ -162,17 +148,17 @@ export const getLeaderboardAction = async () => {
         playerName,
         score
       }
-    `, {}, { next: { revalidate: 0 } }); // تحديث فوري
+    `, {}, { next: { revalidate: 0 } });
   } catch { return []; }
 };
 
-// 6. جلب الإعدادات
 export const getGameConfig = async () => {
   try {
     const config = await client.fetch(`*[_type == "gameConfig"][0]{
       timerDuration, senzuCount, hintCount, isMaintenanceMode,
       thresholds, texts, theme, sounds
-    }`, {}, { cache: 'no-store' }); // مهم جداً للتحديث الفوري
+    }`, {}, { cache: 'no-store' });
+    
     return config || { 
       timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
       thresholds: { ssj: 2500, blue: 5000, ui: 8000 },

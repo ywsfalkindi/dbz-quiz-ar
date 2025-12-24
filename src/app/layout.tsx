@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
-import { getGameConfig } from "./actions/adminActions"; // سنحتاج دالة لجلب الإعدادات
+import { getGameConfig } from "./actions/adminActions";
 
 const cairo = Cairo({
   subsets: ["arabic"],
@@ -11,12 +11,12 @@ const cairo = Cairo({
 
 export const metadata: Metadata = {
   title: "تحدي دراغون كويز Z",
-  description: "أثبت أنك أقوى محارب في الكون في لعبة الأسئلة هذه!",
+  description: "أثبت أنك أقوى محارب في الكون في لعبة الأسئلة الأسطورية هذه!",
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: "DBZ Quiz",
+    title: "تحدي دراغون",
   },
 };
 
@@ -33,14 +33,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // جلب الإعدادات من السيرفر مباشرة لتطبيق الألوان
+  // جلب الإعدادات لتطبيق الألوان
   const config = await getGameConfig();
   const primaryColor = config.theme?.primaryColor || '#F85B1A';
   
   return (
     <html lang="ar" dir="rtl">
       <head>
-        {/* حقن الألوان الديناميكية هنا */}
         <style>{`
           :root {
             --primary-color: ${primaryColor};
@@ -50,7 +49,7 @@ export default async function RootLayout({
           .bg-dbz-orange { background-color: var(--primary-color) !important; }
         `}</style>
       </head>
-      <body className={`${cairo.variable} font-sans antialiased bg-[#050505] overflow-hidden`}>
+      <body className={`${cairo.variable} font-cairo antialiased bg-[#050505] overflow-hidden`}>
         {children}
       </body>
     </html>

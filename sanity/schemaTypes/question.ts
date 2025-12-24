@@ -1,34 +1,35 @@
-import {defineField, defineType} from 'sanity'
+import { defineField, defineType } from 'sanity'
 
 export default defineType({
   name: 'question',
-  title: 'Question',
+  title: '❓ الأسئلة', // تعريب العنوان في القائمة الجانبية
   type: 'document',
   fields: [
     defineField({
       name: 'title',
-      title: 'عنوان السؤال',
+      title: 'نص السؤال',
       type: 'string',
-      validation: (Rule) => Rule.required(),
+      validation: (Rule) => Rule.required().error('يجب كتابة السؤال!'),
     }),
     defineField({
       name: 'difficulty',
-      title: 'درجة الصعوبة',
+      title: 'مستوى الصعوبة',
       type: 'string',
       options: {
         list: [
-          {title: 'مزارع', value: 'farmer'},
-          {title: 'مقاتل Z', value: 'z-fighter'},
-          {title: 'سوبر سايان', value: 'super-saiyan'},
-          {title: 'حاكم دمار', value: 'god-of-destruction'},
+          { title: 'مزارع (سهل جداً)', value: 'farmer' },
+          { title: 'مقاتل Z (متوسط)', value: 'z-fighter' },
+          { title: 'سوبر سايان (صعب)', value: 'super-saiyan' },
+          { title: 'حاكم دمار (صعب جداً)', value: 'god-of-destruction' },
         ],
         layout: 'radio',
       },
+      initialValue: 'z-fighter',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
       name: 'answers',
-      title: 'الإجابات',
+      title: 'الإجابات (يجب أن تكون 4)',
       type: 'array',
       of: [
         {
@@ -36,13 +37,13 @@ export default defineType({
           fields: [
             {
               name: 'answer',
-              title: 'الإجابة',
+              title: 'نص الإجابة',
               type: 'string',
               validation: (Rule) => Rule.required(),
             },
             {
               name: 'isCorrect',
-              title: 'إجابة صحيحة؟',
+              title: 'هل هذه هي الإجابة الصحيحة؟',
               type: 'boolean',
               initialValue: false,
             },
@@ -52,28 +53,30 @@ export default defineType({
               title: 'answer',
               isCorrect: 'isCorrect',
             },
-            prepare({title, isCorrect}) {
+            prepare({ title, isCorrect }) {
               return {
-                title: `${title} ${isCorrect ? '✅' : ''}`,
+                title: title,
+                subtitle: isCorrect ? 'إجابة صحيحة ✅' : 'إجابة خاطئة ❌',
               }
             },
           },
         },
       ],
-      validation: (Rule) => Rule.min(4).max(4),
+      validation: (Rule) => Rule.min(4).max(4).error('يجب توفير 4 إجابات بالضبط!'),
     }),
     defineField({
       name: 'explanation',
-      title: 'شرح الإجابة',
+      title: 'شرح وتوضيح (يظهر بعد الحل)',
       type: 'text',
-      description: 'شرح يظهر بعد الحل (لكتابة معلومة إثرائية بالعربية).',
+      rows: 3,
+      description: 'معلومة إضافية تظهر للاعب سواء أجاب صح أم خطأ.',
     }),
     defineField({
       name: 'image',
-      title: 'صورة للسؤال',
+      title: 'صورة مرفقة (اختياري)',
       type: 'image',
       options: {
-        hotspot: true, // <-- Defaults to false
+        hotspot: true,
       },
     }),
   ],
