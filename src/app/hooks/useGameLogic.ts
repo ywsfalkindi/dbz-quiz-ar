@@ -4,7 +4,6 @@ import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction, getGameC
 import useSound from '../../hooks/useSound';
 import confetti from 'canvas-confetti';
 
-// دالة الاهتزاز (للهواتف فقط)
 const vibrateDevice = (pattern: number | number[]) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(pattern);
@@ -14,8 +13,7 @@ const vibrateDevice = (pattern: number | number[]) => {
 export const useGameLogic = () => {
   const store = useGameStore();
   const playSound = useSound();
-
-  // حالات محلية خاصة بواجهة المستخدم فقط
+  
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
@@ -23,14 +21,14 @@ export const useGameLogic = () => {
   const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
-  // 1. تحميل الإعدادات عند فتح الموقع
+  // تحميل الإعدادات
   useEffect(() => {
     async function initGame() {
       try {
         const config = await getGameConfig();
         store.setGameConfig(config);
       } catch (e) {
-        console.error("فشل تحميل الإعدادات، استخدام الافتراضي", e);
+        console.error("خطأ في التحميل", e);
       } finally {
         setIsConfigLoaded(true);
       }
@@ -39,7 +37,7 @@ export const useGameLogic = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. جلب الأسئلة عند بدء اللعب
+  // جلب الأسئلة
   useEffect(() => {
     async function loadQuestions() {
       if (store.status === 'playing' && store.questions.length === 0) {
@@ -51,7 +49,7 @@ export const useGameLogic = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.status]);
 
-  // تصفير التأثيرات عند كل سؤال جديد
+  // تنظيف الواجهة عند كل سؤال
   useEffect(() => {
     setHiddenAnswers([]);
     setSelectedAnswerKey(null);
@@ -59,26 +57,22 @@ export const useGameLogic = () => {
     setCorrectAnswerKey(null);
   }, [store.currentQuestionIndex]);
 
-  // --- منطق الانتقال للسؤال التالي أو إنهاء اللعبة ---
+  // الانتقال للتالي
   const triggerNextStep = useCallback(() => {
     const { currentQuestionIndex, questions, health } = useGameStore.getState();
     
-    // إذا مات اللاعب، لا تفعل شيئاً (المتجر تكفل بتحويل الحالة لخسارة)
     if (health <= 0) return;
 
-    // هل تبقى أسئلة؟
     if (currentQuestionIndex < questions.length - 1) {
       store.nextQuestion();
     } else {
-      // انتهت الأسئلة واللاعب ما زال حياً = فوز
       playSound('win');
       triggerWinConfetti();
       store.setGameWon();
     }
   }, [store, playSound]);
 
-  // --- الإجراءات ---
-
+  // الإجراءات
   const handleStart = () => {
     if (!isConfigLoaded) return;
     playSound('click');
@@ -94,7 +88,7 @@ export const useGameLogic = () => {
 
   const handleUseSenzu = () => {
     if (store.inventory.senzuBeans > 0 && store.health < 100) {
-      playSound('correct'); // صوت إيجابي
+      playSound('correct');
       vibrateDevice([50, 50, 50]);
       store.useSenzuBean();
     }
@@ -113,7 +107,6 @@ export const useGameLogic = () => {
     }
   };
 
-  // تأثير الاحتفال
   const triggerWinConfetti = () => {
     const duration = 3000;
     const end = Date.now() + duration;
@@ -130,65 +123,67 @@ export const useGameLogic = () => {
     }());
   };
 
-  // عند انتهاء الوقت
   const handleTimeUp = () => {
-    // إذا كان اللاعب قد أجاب بالفعل ويتم التحقق، لا تحتسب الوقت
     if (isVerifying || selectedAnswerKey) return;
-
     playSound('wrong');
     vibrateDevice([100, 50, 100]);
     setDamageFlash(true);
     setTimeout(() => setDamageFlash(false), 500);
     
-    store.answerQuestion(false); // إجابة خاطئة
+    store.punishWrongAnswer();
     
-    // التحقق هل مات؟
     const { health } = useGameStore.getState();
     if (health > 0) {
-        // ننتظر قليلاً ليرى اللاعب أنه أخطأ ثم ننتقل
         setTimeout(triggerNextStep, 1500);
     }
   };
 
-  // عند اختيار إجابة
+  // --- التعامل مع الإجابة (النقطة الحرجة) ---
   const handleAnswer = async (questionId: string, answerKey: string) => {
-    if (isVerifying || selectedAnswerKey) return; // منع النقر المتعدد
+    if (isVerifying || selectedAnswerKey) return;
     
     playSound('click');
     vibrateDevice(20);
-    
     setIsVerifying(true);
     setSelectedAnswerKey(answerKey);
 
-    // التحقق من السيرفر
-    const { isCorrect, correctAnswerKey } = await verifyAnswerAction(questionId, answerKey);
+    // نجهز البيانات للسيرفر
+    const currentState = useGameStore.getState();
+    
+    // نستدعي السيرفر
+    const result = await verifyAnswerAction({
+      questionId, 
+      answerKey,
+      currentScore: currentState.score,
+      securityToken: currentState.securityToken,
+      timeLeft: currentState.timer,
+      streak: currentState.streak
+    });
 
-    if (isCorrect) {
+    if (result.isCorrect) {
       playSound('correct');
       vibrateDevice([50, 30, 50]);
-      confetti({
-        particleCount: 50, spread: 60, origin: { y: 0.8 },
-        colors: ['#22c55e', '#FFD600']
-      });
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.8 }, colors: ['#22c55e', '#FFD600'] });
+      
+      // تحديث النقاط من المصدر الموثوق (السيرفر)
+      if (result.newScore !== undefined && result.newSecurityToken) {
+          store.updateScoreSecurely(result.newScore, result.newSecurityToken, result.newStreak || 0);
+      }
+
     } else {
       playSound('wrong');
       vibrateDevice([100, 100, 100]);
       setDamageFlash(true);
       setTimeout(() => setDamageFlash(false), 500);
+      store.punishWrongAnswer();
     }
 
-    store.answerQuestion(isCorrect);
-    setCorrectAnswerKey(correctAnswerKey);
+    setCorrectAnswerKey(result.correctAnswerKey || null);
 
-    // الانتقال للسؤال التالي بعد رؤية النتيجة
-    // ننتظر أطول قليلاً إذا كانت الإجابة صحيحة للاحتفال، وأقل إذا كانت خاطئة
-    const delay = isCorrect ? 2000 : 2500;
-    
-    // ملاحظة: حتى لو أصبحت الصحة 0، نعرض النتيجة أولاً ثم المتجر سيحدث الحالة لـ Lost
-    // لكننا نتحقق هنا لكي لا ننتقل للسؤال التالي إذا خسر
+    const delay = result.isCorrect ? 2000 : 2500;
     const { health } = useGameStore.getState();
     
-    if (health > 0 || isCorrect) {
+    if (health > 0 || result.isCorrect) {
          setTimeout(triggerNextStep, delay);
     }
   };

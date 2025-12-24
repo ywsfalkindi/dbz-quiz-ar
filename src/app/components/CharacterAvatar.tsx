@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { SaiyanForm } from '../store/gameStore';
 
 export default function CharacterAvatar({ form }: { form: { form: SaiyanForm, color: string, label: string } }) {
-  // يمكنك استبدال النصوص بصور حقيقية لكل تحول مستقبلاً
   const getEmoji = () => {
     switch(form.form) {
       case 'ui': return '⚪';
@@ -23,8 +22,8 @@ export default function CharacterAvatar({ form }: { form: { form: SaiyanForm, co
       >
         {getEmoji()}
       </motion.div>
-      <div className="flex flex-col">
-        <span className="text-xs text-gray-400 uppercase tracking-wider">الحالة الحالية</span>
+      <div className="flex flex-col font-cairo">
+        <span className="text-xs text-gray-400 uppercase tracking-wider">مستوى القوة</span>
         <span className="text-sm font-bold" style={{ color: form.color, textShadow: `0 0 10px ${form.color}` }}>
           {form.label}
         </span>

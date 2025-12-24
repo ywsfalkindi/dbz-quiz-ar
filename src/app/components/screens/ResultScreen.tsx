@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { submitScoreAction, getLeaderboardAction } from '@/app/actions/gameActions';
+import useGameStore from '@/app/store/gameStore';
 
 interface ResultScreenProps {
   status: 'won' | 'lost';
@@ -12,7 +13,11 @@ interface ResultScreenProps {
 export default function ResultScreen({ status, score, onRestart }: ResultScreenProps) {
   const [name, setName] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [leaderboard, setLeaderboard] = useState<{playerName:string, score:number}[]>([]);
+  
+  // نجلب التوكن من المتجر
+  const securityToken = useGameStore(state => state.securityToken);
 
   useEffect(() => {
     if (status === 'won') {
@@ -23,20 +28,27 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
   const handleSubmit = async () => {
     if (!name.trim()) return;
     setSubmitted(true);
-    await submitScoreAction(name, score);
-    const newList = await getLeaderboardAction();
-    setLeaderboard(newList);
+    
+    // نرسل السكور مع التوكن للتحقق
+    const result = await submitScoreAction(name, score, securityToken);
+    
+    if (result.error) {
+        setErrorMsg(result.error);
+        setSubmitted(false);
+    } else {
+        const newList = await getLeaderboardAction();
+        setLeaderboard(newList);
+    }
   };
 
   const isWin = status === 'won';
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center h-full text-center gap-6 z-10 p-4 overflow-y-auto w-full"
+      className="flex flex-col items-center justify-center h-full text-center gap-6 z-10 p-4 overflow-y-auto w-full font-cairo"
     >
-      <h2 className={`text-fluid-h2 font-black drop-shadow-lg font-cairo ${isWin ? 'text-dbz-yellow' : 'text-red-600'}`}>
+      <h2 className={`text-fluid-h2 font-black drop-shadow-lg ${isWin ? 'text-dbz-yellow' : 'text-red-600'}`}>
         {isWin ? '🎉 انتصار أسطوري!' : '💀 هزيمة ساحقة...'}
       </h2>
       
@@ -53,7 +65,7 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
             <div className="flex gap-2">
             <input 
                 type="text" 
-                placeholder="اكتب اسم المحارب هنا..." 
+                placeholder="اسم المحارب..." 
                 className="flex-1 p-3 rounded-lg text-black font-bold text-center outline-none border-2 border-dbz-orange focus:border-white"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -66,6 +78,7 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
                 حفظ
             </button>
             </div>
+            {errorMsg && <p className="text-red-500 text-sm font-bold">{errorMsg}</p>}
         </div>
       )}
 

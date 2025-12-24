@@ -6,8 +6,9 @@ import { client } from '@/../sanity/lib/client';
 import { createClient } from 'next-sanity';
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import crypto from 'crypto'; // مكتبة التشفير
 
-// عميل الكتابة
+// --- إعدادات الاتصال ---
 const writeClient = createClient({
   projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
   dataset: process.env.NEXT_PUBLIC_SANITY_DATASET,
@@ -28,15 +29,11 @@ const ratelimit = redis
       limiter: Ratelimit.slidingWindow(10, "10 s"),
     }) : null;
 
-interface SanityImage {
-  _type: 'image';
-  asset: { _ref: string; _type: 'reference'; };
-}
-
+// --- أنواع البيانات ---
 interface SanityQuestion {
   _id: string;
   title: string;
-  image?: SanityImage;
+  image?: { _type: 'image'; asset: { _ref: string; _type: 'reference'; }; };
   explanation: string;
   answers: { _key: string; answer: string; isCorrect?: boolean }[];
 }
@@ -44,45 +41,70 @@ interface SanityQuestion {
 export interface Question {
   _id: string;
   title: string;
-  image?: SanityImage;
+  image?: { _type: 'image'; asset: { _ref: string; _type: 'reference'; }; };
   explanation: string;
   answers: { _key: string; answer: string }[];
 }
 
+// --- أدوات التشفير (سر المهنة) ---
+const SECRET_KEY = process.env.SANITY_API_WRITE_TOKEN || 'default_secret_key_change_me';
+
+// دالة لصنع "الختم السري" (Token)
+function generateSecureToken(currentScore: number): string {
+  const data = `${currentScore}-${SECRET_KEY}`;
+  // نقوم بخلط البيانات بطريقة لا يمكن عكسها (Hashing)
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+// --- الوظائف (Actions) ---
+
+// 1. جلب الأسئلة
 export const fetchGameQuestions = async (): Promise<Question[]> => {
   const questions = await client.fetch<SanityQuestion[]>(
     `*[_type == "question"]{
-      _id,
-      title,
-      image,
-      explanation,
-      answers[]{ _key, answer }
-    }`,
-    {},
-    { cache: 'no-store' } 
+      _id, title, image, explanation, answers[]{ _key, answer }
+    }`, {}, { cache: 'no-store' } 
   );
+  // ترتيب عشوائي وحذف الإجابة الصحيحة من البيانات المرسلة للمتصفح
   return questions.sort(() => Math.random() - 0.5).map(q => ({
     ...q,
     answers: q.answers || [],
   }));
 };
 
+// 2. التحقق من الإجابة وحساب النقاط (العقل المدبر)
 const verifyAnswerSchema = z.object({
   questionId: z.string(),
   answerKey: z.string(),
+  currentScore: z.number(),      // النقاط الحالية التي يزعم اللاعب امتلاكها
+  securityToken: z.string(),     // الختم الأمني للتأكد من صحة النقاط
+  timeLeft: z.number(),          // الوقت المتبقي لحساب المكافأة
+  streak: z.number(),            // التتابع لحساب المكافأة
 });
 
-export const verifyAnswerAction = async (questionId: string, answerKey: string) => {
+export const verifyAnswerAction = async (data: unknown) => {
+  // فحص الأمان: هل تحاول الإجابة بسرعة جنونية؟ (Bot Protection)
   if (ratelimit) {
     const ip = (await headers()).get("x-forwarded-for") || "unknown";
     const { success } = await ratelimit.limit(ip);
-    if (!success) return { isCorrect: false, correctAnswerKey: '', explanation: 'هدئ سرعتك أيها المحارب! حاول ببطء أكثر.' };
+    if (!success) return { isCorrect: false, message: 'اهدأ قليلاً أيها المحارب! السرعة عالية جداً.' };
   }
 
-  const validation = verifyAnswerSchema.safeParse({ questionId, answerKey });
-  if (!validation.success) return { isCorrect: false, correctAnswerKey: '', explanation: 'بيانات غير صحيحة' };
+  // التحقق من صحة البيانات المرسلة
+  const parsed = verifyAnswerSchema.safeParse(data);
+  if (!parsed.success) return { isCorrect: false, message: 'بيانات المعركة غير صحيحة.' };
+
+  const { questionId, answerKey, currentScore, securityToken, timeLeft, streak } = parsed.data;
+
+  // 1. التحقق من "الختم" (هل تلاعب اللاعب بالنقاط السابقة؟)
+  // إذا كان الختم الذي أرسله اللاعب لا يطابق الختم الذي نصنعه الآن، فهو غشاش
+  const expectedToken = generateSecureToken(currentScore);
+  if (securityToken !== expectedToken) {
+    return { isCorrect: false, message: 'تم اكتشاف محاولة تلاعب بالطاقة! (Invalid Token)' };
+  }
 
   try {
+    // 2. جلب الإجابة الحقيقية من الخزنة (Sanity)
     const question = await client.fetch<SanityQuestion>(
       `*[_type == "question" && _id == $questionId][0]{ explanation, answers }`,
       { questionId }
@@ -94,16 +116,39 @@ export const verifyAnswerAction = async (questionId: string, answerKey: string) 
 
     if (!selected || !correct) throw new Error();
 
+    const isCorrect = selected.isCorrect === true;
+    let newScore = currentScore;
+    let newStreak = 0;
+
+    // 3. حساب النقاط الجديد (يتم هنا في السيرفر لضمان الأمان)
+    if (isCorrect) {
+        const timeBonus = Math.ceil(timeLeft * 10); // مكافأة السرعة
+        const streakBonus = streak * 50;            // مكافأة التتابع
+        const basePoints = 100;
+        newScore = currentScore + basePoints + timeBonus + streakBonus;
+        newStreak = streak + 1;
+    } else {
+        newStreak = 0;
+    }
+
+    // 4. إنشاء ختم جديد للنقاط الجديدة
+    const newSecurityToken = generateSecureToken(newScore);
+
     return {
-      isCorrect: selected.isCorrect === true,
+      isCorrect,
       correctAnswerKey: correct._key,
-      explanation: question.explanation || 'لا يوجد شرح إضافي لهذا السؤال.',
+      explanation: question.explanation || 'لا يوجد شرح إضافي.',
+      newScore,        // نرسل النقاط المعتمدة الجديدة
+      newSecurityToken,// نرسل الختم الجديد للمعركة القادمة
+      newStreak
     };
+
   } catch {
-    return { isCorrect: false, correctAnswerKey: '', explanation: 'حدث خطأ تقني في الاتصال بكوكب كاي.' };
+    return { isCorrect: false, message: 'خطأ في الاتصال بكوكب كاي.' };
   }
 };
 
+// 3. المساعدة: حذف إجابتين (50/50)
 export const getWrongAnswersAction = async (questionId: string): Promise<string[]> => {
   try {
     const question = await client.fetch<SanityQuestion>(
@@ -111,7 +156,6 @@ export const getWrongAnswersAction = async (questionId: string): Promise<string[
       { questionId }
     );
     if (!question?.answers) return [];
-    
     return question.answers
       .filter(a => !a.isCorrect)
       .sort(() => 0.5 - Math.random())
@@ -120,13 +164,17 @@ export const getWrongAnswersAction = async (questionId: string): Promise<string[
   } catch { return []; }
 };
 
-export const submitScoreAction = async (playerName: string, score: number) => {
-  if (!process.env.SANITY_API_WRITE_TOKEN) return;
-  if (score > 50000 || score < 0) {
-    console.error(`محاولة تلاعب مشبوهة من ${playerName}`);
-    return; 
+// 4. تسجيل النتيجة النهائية
+export const submitScoreAction = async (playerName: string, score: number, securityToken: string) => {
+  if (!process.env.SANITY_API_WRITE_TOKEN) return { error: 'نظام الكتابة غير مفعل' };
+
+  // التحقق الأخير: هل النقاط التي يريد حفظها موثقة بختمنا؟
+  const expectedToken = generateSecureToken(score);
+  if (securityToken !== expectedToken) {
+     return { error: 'محاولة غش مكشوفة! لن يتم تسجيل الرقم.' };
   }
 
+  // تنظيف الاسم من الرموز والشتائم المحتملة (نقبل الحروف والأرقام فقط)
   const cleanName = playerName.replace(/[^a-zA-Z0-9\u0600-\u06FF ]/g, "").substring(0, 20);
 
   try {
@@ -136,22 +184,25 @@ export const submitScoreAction = async (playerName: string, score: number) => {
       score: score,
       date: new Date().toISOString()
     });
+    return { success: true };
   } catch (e) {
-    console.error("فشل حفظ النتيجة", e);
+    console.error(e);
+    return { error: 'فشل حفظ البيانات في السجل الكوني.' };
   }
 };
 
+// 5. لوحة الصدارة
 export const getLeaderboardAction = async () => {
   try {
     return await client.fetch(`
       *[_type == "leaderboard"] | order(score desc)[0...10] {
-        playerName,
-        score
+        playerName, score
       }
     `, {}, { next: { revalidate: 0 } });
   } catch { return []; }
 };
 
+// 6. الإعدادات
 export const getGameConfig = async () => {
   try {
     const config = await client.fetch(`*[_type == "gameConfig"][0]{

@@ -8,38 +8,37 @@ interface GameTimerProps {
 }
 
 export default function GameTimer({ onTimeUp }: GameTimerProps) {
-  const { timer, decrementTimer, status } = useGameStore();
-  const maxTime = 15; // يجب أن يطابق القيمة في الـ store
+  const { timer, syncTimer, status, config } = useGameStore();
+  const maxTime = config.timerDuration; 
 
   useEffect(() => {
-    // يعمل المؤقت فقط أثناء اللعب
     if (status !== 'playing') return;
 
-    // إذا انتهى الوقت، نستدعي دالة الانتهاء
+    // إذا انتهى الوقت، بلغ الحكم
     if (timer <= 0) {
       onTimeUp();
       return;
     }
 
-    // تنقيص الوقت كل ثانية
+    // تحقق من الوقت كل 200 جزء من الثانية لدقة أعلى
     const interval = setInterval(() => {
-      decrementTimer();
-    }, 1000);
+      syncTimer(); // استدعاء دالة المزامنة الحقيقية
+    }, 200);
 
     return () => clearInterval(interval);
-  }, [timer, status, decrementTimer, onTimeUp]);
+  }, [timer, status, syncTimer, onTimeUp]);
 
-  // حساب النسبة المئوية للشريط
-  const percentage = (timer / maxTime) * 100;
+  // حساب النسبة المئوية
+  // نستخدم Math.min لضمان ألا تزيد النسبة عن 100 في حال وجود خلل بسيط
+  const percentage = Math.min(100, Math.max(0, (timer / maxTime) * 100));
   
-  // تغيير اللون: أخضر > أصفر > أحمر
   const color = percentage > 50 ? '#22c55e' : percentage > 20 ? '#eab308' : '#ef4444';
 
   return (
     <div className="w-full max-w-4xl mt-4 mb-2">
-      <div className="flex justify-between text-white mb-1 font-bold px-1">
+      <div className="flex justify-between text-white mb-1 font-bold px-1 font-cairo">
         <span>الزمن المتبقي</span>
-        <span className={`${timer <= 5 ? 'text-red-500 animate-pulse' : ''}`}>
+        <span className={`dir-ltr ${timer <= 5 ? 'text-red-500 animate-pulse' : ''}`}>
           {timer}s
         </span>
       </div>
@@ -51,7 +50,7 @@ export default function GameTimer({ onTimeUp }: GameTimerProps) {
             width: `${percentage}%`,
             backgroundColor: color
           }}
-          transition={{ duration: 1, ease: "linear" }}
+          transition={{ duration: 0.5, ease: "linear" }}
         />
       </div>
     </div>
