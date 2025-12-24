@@ -1,3 +1,4 @@
+// src/app/components/screens/GameScreen.tsx
 'use client';
 import { motion } from 'framer-motion';
 import GameSkeleton from '../GameSkeleton';
@@ -22,7 +23,6 @@ interface GameScreenProps {
   selectedAnswerKey: string | null;
   isVerifying: boolean;
   correctAnswerKey: string | null;
-  // دوال
   onTimeUp: () => void;
   onAnswer: (qId: string, k: string) => void;
   onUseSenzu: () => void;
@@ -50,7 +50,7 @@ export default function GameScreen(props: GameScreenProps) {
         <GameTimer onTimeUp={props.onTimeUp} />
         <div className="flex justify-between w-full text-sm font-mono text-dbz-energy px-2">
           <span>الطاقة: {props.score}</span>
-          <span>المعركة: {props.currentQuestionIndex + 1}/{props.totalQuestions}</span>
+          <span>المعركة: {props.currentQuestionIndex + 1} من {props.totalQuestions}</span>
         </div>
       </div>
 
@@ -58,7 +58,7 @@ export default function GameScreen(props: GameScreenProps) {
       <div className="flex-1 overflow-y-auto px-4 py-2 scrollbar-hide relative">
         <QuestionCard 
           question={props.question.title} 
-          image={props.question.image} // إضافة الصورة
+          image={props.question.image} 
           borderColor={props.saiyanForm.color} 
         />
         

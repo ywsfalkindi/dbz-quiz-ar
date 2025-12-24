@@ -1,3 +1,4 @@
+// src/app/components/screens/ResultScreen.tsx
 'use client';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -25,13 +26,11 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
     if (!name.trim()) return;
     setSubmitted(true);
     await submitScoreAction(name, score);
-    // تحديث القائمة
     const newList = await getLeaderboardAction();
     setLeaderboard(newList);
   };
 
   const isWin = status === 'won';
-
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -48,12 +47,11 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
         مستوى الطاقة النهائي: <span className="font-mono text-dbz-energy">{score}</span>
       </div>
 
-      {/* نموذج حفظ النتيجة للفائزين فقط */}
       {isWin && !submitted && (
         <div className="flex gap-2 w-full max-w-xs">
           <input 
             type="text" 
-            placeholder="ادخل اسم المحارب" 
+            placeholder="اكتب اسمك يا بطل" 
             className="flex-1 p-2 rounded text-black font-bold text-center"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -68,7 +66,6 @@ export default function ResultScreen({ status, score, onRestart }: ResultScreenP
         </div>
       )}
 
-      {/* جدول المتصدرين */}
       {isWin && leaderboard.length > 0 && (
         <div className="w-full max-w-xs bg-black/50 p-4 rounded-xl border border-white/10">
           <h3 className="text-dbz-orange font-bold mb-2">أقوى المحاربين</h3>

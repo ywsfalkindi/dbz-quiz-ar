@@ -1,5 +1,7 @@
+// src/app/page.tsx
 'use client';
 
+import { useState, useEffect } from 'react'; // إضافة useEffect
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameLogic } from './hooks/useGameLogic';
 import StartScreen from './components/screens/StartScreen';
@@ -12,6 +14,11 @@ const shakeVariants = {
 };
 
 export default function Home() {
+  // إصلاح الذاكرة: ننتظر حتى يصبح المتصفح جاهزاً
+  const [isMounted, setIsMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setIsMounted(true), []);
+
   const {
     status, health, score, questions, currentQuestionIndex, inventory,
     handleStart, handleRestart, handleAnswer, handleTimeUp, handleUseSenzu, handleUseHint,
@@ -20,6 +27,9 @@ export default function Home() {
 
   const currentQuestion = questions[currentQuestionIndex];
   const isLoading = status === 'playing' && !currentQuestion;
+
+  // إذا لم يتم تحميل الصفحة بالكامل، لا تعرض شيئاً (يمنع أخطاء Hydration)
+  if (!isMounted) return null;
 
   // شاشة الصيانة
   if (status === 'maintenance') {
@@ -42,6 +52,7 @@ export default function Home() {
       animate={damageFlash ? "shake" : "idle"}
       variants={shakeVariants}
       className="fixed inset-0 w-full h-dvh bg-black bg-space-pattern flex flex-col overflow-hidden font-sans"
+      dir="rtl" // تأكيد الاتجاه العربي
     >
       {damageFlash && (
         <div className="absolute inset-0 bg-red-600/30 z-50 pointer-events-none mix-blend-overlay" />

@@ -1,3 +1,4 @@
+// src/app/store/gameStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Question } from '../actions/gameActions';
@@ -5,7 +6,6 @@ import { Question } from '../actions/gameActions';
 export type SaiyanForm = 'base' | 'kaioken' | 'ssj' | 'blue' | 'ui';
 type GameStatus = 'start' | 'playing' | 'won' | 'lost' | 'maintenance';
 
-// تعريف شكل الإعدادات الجديد والموسع
 interface GameConfig {
   timerDuration: number;
   senzuCount: number;
@@ -13,7 +13,7 @@ interface GameConfig {
   theme?: {
     primaryColor: string;
     secondaryColor: string;
-    backgroundImage?: string; // سنخزن الرابط هنا
+    backgroundImage?: string;
   };
   sounds?: {
     clickSound?: string;
@@ -38,7 +38,6 @@ interface GameState {
   inventory: { senzuBeans: number; hints: number };
   config: GameConfig;
 
-  // Actions
   setGameConfig: (config: GameConfig) => void;
   setQuestions: (questions: Question[]) => void;
   startGame: () => void;
@@ -65,11 +64,10 @@ const useGameStore = create<GameState>()(
       difficultyMultiplier: 0,
       inventory: { senzuBeans: 1, hints: 1 },
       
-      // القيم الافتراضية
       config: { 
         timerDuration: 15, senzuCount: 1, hintCount: 1, isMaintenanceMode: false,
         thresholds: { ssj: 2500, blue: 5000, ui: 8000 },
-        texts: { loadingText: 'جاري التحميل...', winTitle: 'فزت!', loseTitle: 'خسرت...' },
+        texts: { loadingText: 'جاري تجميع الطاقة...', winTitle: 'انتصار أسطوري!', loseTitle: 'هزيمة مؤلمة...' },
         theme: { primaryColor: '#F85B1A', secondaryColor: '#FFD600' }
       },
 
@@ -159,5 +157,4 @@ const useGameStore = create<GameState>()(
     }
   )
 );
-
 export default useGameStore;

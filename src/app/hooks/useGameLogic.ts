@@ -1,9 +1,11 @@
+// src/app/hooks/useGameLogic.ts
 import { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
-import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction, getGameConfig } from '../actions/gameActions'; // تأكدنا من استيراد getGameConfig
-import { playSound } from '../utils/sounds';
+import { fetchGameQuestions, verifyAnswerAction, getWrongAnswersAction, getGameConfig } from '../actions/gameActions';
+import useSound from '../../hooks/useSound';
 import confetti from 'canvas-confetti';
 
+// دالة اهتزاز الهاتف
 const vibrateDevice = (pattern: number | number[]) => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     navigator.vibrate(pattern);
@@ -12,6 +14,7 @@ const vibrateDevice = (pattern: number | number[]) => {
 
 export const useGameLogic = () => {
   const store = useGameStore();
+  const playSound = useSound(); // تفعيل نظام الصوت الجديد
   const [selectedAnswerKey, setSelectedAnswerKey] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [correctAnswerKey, setCorrectAnswerKey] = useState<string | null>(null);
@@ -19,18 +22,16 @@ export const useGameLogic = () => {
   const [hiddenAnswers, setHiddenAnswers] = useState<string[]>([]);
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
-  // 1. تحميل الإعدادات من السيرفر عند فتح اللعبة
+  // 1. تحميل الإعدادات
   useEffect(() => {
     async function initGame() {
-      // جلب الإعدادات
       const config = await getGameConfig();
-      // تحديث المتجر بالإعدادات
       store.setGameConfig(config);
       setIsConfigLoaded(true);
     }
     initGame();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // تعمل مرة واحدة فقط
+  }, []);
 
   // 2. تحميل الأسئلة
   useEffect(() => {
@@ -50,7 +51,7 @@ export const useGameLogic = () => {
   }, [store.currentQuestionIndex]);
 
   const handleStart = () => {
-    if (!isConfigLoaded) return; // منع البدء قبل تحميل الإعدادات
+    if (!isConfigLoaded) return;
     playSound('click');
     vibrateDevice(50);
     store.startGame();
@@ -100,21 +101,19 @@ export const useGameLogic = () => {
   };
 
   const triggerWinConfetti = () => {
-      const duration = 3000;
-      const end = Date.now() + duration;
-      (function frame() {
-        confetti({
-          particleCount: 5, angle: 60, spread: 55, origin: { x: 0 },
-          colors: ['#F85B1A', '#FFD600', '#00F0FF']
-        });
-        confetti({
-          particleCount: 5, angle: 120, spread: 55, origin: { x: 1 },
-           colors: ['#F85B1A', '#FFD600', '#00F0FF']
-        });
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
-      }());
+    const duration = 3000;
+    const end = Date.now() + duration;
+    (function frame() {
+      confetti({
+        particleCount: 5, angle: 60, spread: 55, origin: { x: 0 },
+        colors: ['#F85B1A', '#FFD600', '#00F0FF']
+      });
+      confetti({
+        particleCount: 5, angle: 120, spread: 55, origin: { x: 1 },
+        colors: ['#F85B1A', '#FFD600', '#00F0FF']
+      });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    }());
   };
 
   const handleTimeUp = () => {
